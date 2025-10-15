@@ -1,5 +1,8 @@
 from django.shortcuts import render
 from django.urls import path
+from django.conf.urls.static import static
+
+from attendance_system import settings
 from . import views, pwa_views
 
 urlpatterns = [
@@ -59,3 +62,7 @@ urlpatterns = [
     # ... (Keep all existing student and PWA routes) ...
 
 ]
+print(settings.DEBUG)
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
