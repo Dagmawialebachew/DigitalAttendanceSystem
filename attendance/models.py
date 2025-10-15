@@ -149,18 +149,28 @@ class AttendanceSession(models.Model):
 
     @staticmethod
     def generate_code():
-        return ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-
+        return ''.join(random.choices(string.digits, k=4))
     def is_valid(self):
+        """Return True if session is still active and not expired."""
         if self.status != 'active':
             return False
+
         time_elapsed = (timezone.now() - self.start_time).total_seconds()
-        return time_elapsed <= self.duration_seconds
+        if time_elapsed > self.duration_seconds:
+            self.end_session()  # automatically end session
+            return False
+        return True
 
     def end_session(self):
-        self.status = 'ended'
-        self.end_time = timezone.now()
-        self.save()
+        """Mark session as ended if duration has passed."""
+        if self.status == 'active':
+            self.status = 'ended'
+            self.save(update_fields=['status'])
+            
+    @staticmethod
+    def get_active_sessions():
+        active_sessions = AttendanceSession.objects.filter(status='active')
+        return [s for s in active_sessions if s.is_valid()]
 
 
 class AttendanceEntry(models.Model):

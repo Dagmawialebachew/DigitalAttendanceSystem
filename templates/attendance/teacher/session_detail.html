@@ -64,9 +64,11 @@
             </div>
         </div>
     </div>
+    <div id="active-sessions" class="mb-4"></div>
+
 
     <div class="glass rounded-2xl p-6">
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex flex-wrap gap-2 justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-slate-900 dark:text-white">Attendance List</h2>
             <a href="{% url 'export_attendance' session.id %}"
                class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors duration-200">
@@ -79,14 +81,14 @@
 
         <div id="attendance-list" class="space-y-3">
             {% for entry in entries %}
-            <div class="bg-white dark:bg-slate-700 rounded-xl p-4 flex items-center justify-between border border-slate-200 dark:border-slate-600 fade-in">
+            <div id="entry-{{ entry.id }}" class="bg-white dark:bg-slate-700 rounded-xl p-4 flex items-center justify-between border border-slate-200 dark:border-slate-600 fade-in">
                 <div class="flex items-center space-x-4">
                     <div class="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-bold">
-                        {{ entry.student.first_name.0 }}{{ entry.student.last_name.0 }}
+                        {{ entry.student.first_name.0|default:"S"}}{{ entry.student.last_name.0 }}
                     </div>
                     <div>
                         <div class="font-semibold text-slate-900 dark:text-white">{{ entry.student.get_full_name }}</div>
-                        <div class="text-sm text-slate-600 dark:text-slate-400">{{ entry.student.email }}</div>
+                        <div class="text-sm text-slate-600 dark:text-slate-400">{{ entry.student.student_profile.student_id }}</div>
                     </div>
                 </div>
                 <div class="flex items-center space-x-3">
@@ -139,94 +141,215 @@
     </div>
 </div>
 
+<style>
+@keyframes slideUp {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up { animation: slideUp 0.5s ease forwards; }
+.pulse-success { animation: pulse 1.2s infinite; }
+</style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    const sessionId = {{ session.id }};
-    const sessionStatus = "{{ session.status }}";
-    const startTime = new Date("{{ session.start_time|date:'c' }}");
-    const duration = {{ session.duration_seconds }};
+const sessionId = {{ session.id }};
+const sessionStatus = "{{ session.status }}";
+const startTime = new Date("{{ session.start_time|date:'c' }}");
+const duration = {{ session.duration_seconds }};
+const totalStudents = {{ total_students }};
 
-    let ws;
+console.log("Session Info:", { sessionId, sessionStatus, startTime, duration, totalStudents });
 
-    function connectWebSocket() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${window.location.host}/ws/attendance/${sessionId}/`);
+// ===========================
+// Utility Functions
+// ===========================
+function formatTime(dateStr) {
+    try {
+        return new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    } catch(err) {
+        console.error("Error formatting time:", dateStr, err);
+        return dateStr;
+    }
+}
 
-        ws.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-
-            if (data.type === 'attendance_update') {
-                updateAttendanceList(data.data);
-            } else if (data.type === 'session_ended') {
-                location.reload();
-            }
-        };
-
-        ws.onclose = function() {
-            setTimeout(connectWebSocket, 3000);
-        };
+// ===========================
+// Render Functions
+// ===========================
+function renderActiveSessions(sessions) {
+    const container = document.getElementById("active-sessions");
+    if (!container) {
+        console.warn("No container found for active sessions (#active-sessions)");
+        return;
     }
 
-    function updateAttendanceList(data) {
-        document.getElementById('present-count').textContent = data.total_present;
-        const rate = Math.round((data.total_present / {{ total_students }}) * 100);
-        document.getElementById('attendance-rate').textContent = rate + '%';
+    console.log("Rendering active sessions:", sessions);
+    container.innerHTML = ""; // Clear old sessions
+    sessions.forEach(s => {
+        const div = document.createElement("div");
+        div.className = "session bg-gray-100 dark:bg-gray-700 p-2 rounded mb-2";
+        div.textContent = `${s.course || 'Unknown Course'} (${s.code || 'No Code'}) - Status: ${s.status || 'Unknown'}`;
+        container.appendChild(div);
+    });
+}
 
-        const list = document.getElementById('attendance-list');
-        if (data.entries.length === 0) {
-            list.innerHTML = '<div class="text-center py-8"><p class="text-slate-600 dark:text-slate-400">No attendance marked yet</p></div>';
-            return;
-        }
+function addAttendanceEntry(entry) {
+    const list = document.getElementById('attendance-list');
+    if (!list) {
+        console.warn("No container found for attendance list (#attendance-list)");
+        return;
+    }
 
-        list.innerHTML = data.entries.map(entry => `
-            <div class="bg-white dark:bg-slate-700 rounded-xl p-4 flex items-center justify-between border border-slate-200 dark:border-slate-600 fade-in pulse-success">
-                <div class="flex items-center space-x-4">
-                    <div class="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-bold">
-                        ${entry.student_name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div>
-                        <div class="font-semibold text-slate-900 dark:text-white">${entry.student_name}</div>
-                        <div class="text-sm text-slate-600 dark:text-slate-400">${entry.student_email}</div>
-                    </div>
+    let div = document.getElementById(`entry-${entry.id}`);
+    console.log("Adding/updating attendance entry:", entry);
+
+    if (!div) {
+        div = document.createElement('div');
+        div.id = `entry-${entry.id}`;
+        div.className = 'bg-white dark:bg-slate-700 rounded-xl p-4 flex items-center justify-between border border-slate-200 dark:border-slate-600 fade-in pulse-success animate-slide-up';
+        div.style.opacity = 0;
+        div.innerHTML = `
+            <div class="flex items-center space-x-4">
+                <div class="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-bold">
+                    ${entry.student_name ? entry.student_name.split(' ').map(n => n[0]).join('') : 'NA'}
                 </div>
-                <div class="flex items-center space-x-3">
-                    ${entry.manually_added ? '<span class="text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded-full">Manual</span>' : ''}
-                    <span class="text-sm text-slate-600 dark:text-slate-400">${new Date(entry.timestamp).toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'})}</span>
-                    <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
+                <div>
+                    <div class="font-semibold text-slate-900 dark:text-white">${entry.student_name || 'Student'}</div>
+                    <div class="text-sm text-slate-600 dark:text-slate-400">${entry.student_id || 'No Student ID'}</div>
                 </div>
             </div>
-        `).join('');
-    }
-
-    if (sessionStatus === 'active') {
-        connectWebSocket();
-
-        function updateCountdown() {
-            const now = new Date();
-            const elapsed = (now - startTime) / 1000;
-            const remaining = Math.max(0, duration - elapsed);
-
-            if (remaining > 0) {
-                document.getElementById('countdown').textContent = `${Math.ceil(remaining)}s remaining`;
-                requestAnimationFrame(updateCountdown);
-            } else {
-                document.getElementById('countdown').textContent = 'Expired';
-            }
+            <div class="flex items-center space-x-3">
+                ${entry.manually_added ? '<span class="text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded-full">Manual</span>' : ''}
+                <span class="text-sm text-slate-600 dark:text-slate-400">${formatTime(entry.timestamp)}</span>
+                <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+        `;
+        list.prepend(div);
+        requestAnimationFrame(() => {
+            div.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            div.style.opacity = 1;
+            div.style.transform = 'translateY(0)';
+        });
+    } else {
+        const tsSpan = div.querySelector('span.text-sm');
+        if(tsSpan) {
+            tsSpan.textContent = formatTime(entry.timestamp);
+        } else {
+            console.warn("Could not find timestamp span to update for entry:", entry.id);
         }
+    }
+}
 
-        updateCountdown();
+function updateStats(totalPresent) {
+    const presentEl = document.getElementById('present-count');
+    const rateEl = document.getElementById('attendance-rate');
+
+    if(!presentEl || !rateEl) {
+        console.warn("Missing stats elements: present-count or attendance-rate");
+        return;
     }
 
-    function showManualOverride() {
-        document.getElementById('manual-override-modal').classList.remove('hidden');
+    presentEl.textContent = totalPresent;
+    rateEl.textContent = Math.round((totalPresent / totalStudents) * 100) + '%';
+}
+
+function updateCountdown() {
+    const countdownEl = document.getElementById('countdown');
+    if (!countdownEl) {
+        console.warn("Countdown element (#countdown) not found");
+        return;
     }
 
-    function hideManualOverride() {
-        document.getElementById('manual-override-modal').classList.add('hidden');
+    const now = new Date();
+    const elapsed = (now - startTime) / 1000;
+    const remaining = Math.max(0, duration - elapsed);
+
+    if (remaining > 0) {
+        const mins = Math.floor(remaining / 60);
+        const secs = Math.floor(remaining % 60);
+        countdownEl.textContent = `${mins}:${secs.toString().padStart(2,'0')} remaining`;
+        requestAnimationFrame(updateCountdown);
+    } else {
+        countdownEl.textContent = 'Expired';
     }
+}
+
+// ===========================
+// WebSocket
+// ===========================
+let ws;
+function connectWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/attendance/${sessionId}/`;
+    console.log("Attempting WebSocket connection to:", wsUrl);
+
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => console.log("WebSocket connected successfully!");
+
+    ws.onmessage = (e) => {
+        console.log("Raw WebSocket message received:", e.data);
+        let data;
+        try { data = JSON.parse(e.data); } 
+        catch(err) { console.error("Failed to parse WebSocket data:", err, e.data); return; }
+
+        console.log("Parsed WebSocket data:", data);
+
+        switch(data.type) {
+            case 'attendance_update':
+                addAttendanceEntry(data.data.entry);
+                updateStats(data.data.total_present);
+                break;
+
+            case 'attendance_entries':
+                console.log("Loading all attendance entries:", data.entries);
+                data.entries.forEach(addAttendanceEntry);
+                break;
+
+            case 'session_ended':
+                console.log("Session ended, reloading page...");
+                location.reload();
+                break;
+
+            case 'active_sessions':
+                renderActiveSessions(data.sessions);
+                break;
+
+            case 'notification':
+                console.log("Notification received:", data.data);
+                break;
+
+            default:
+                console.warn("Unknown WebSocket message type:", data.type, data);
+        }
+    };
+
+    ws.onerror = (err) => console.error("WebSocket error:", err);
+
+    ws.onclose = (e) => {
+        console.warn("WebSocket closed. Reconnecting in 3s...", e);
+        setTimeout(connectWebSocket, 3000);
+    };
+}
+
+// ===========================
+// Manual override modal
+// ===========================
+function showManualOverride() { document.getElementById('manual-override-modal')?.classList.remove('hidden'); }
+function hideManualOverride() { document.getElementById('manual-override-modal')?.classList.add('hidden'); }
+
+// ===========================
+// Init
+// ===========================
+if (sessionStatus === 'active') {
+    console.log("Session is active, initializing WebSocket and countdown");
+    connectWebSocket();
+    updateCountdown();
+} else {
+    console.log("Session is not active, WebSocket not initialized");
+}
 </script>
 {% endblock %}
+

@@ -83,6 +83,8 @@ body {
     padding-bottom: env(safe-area-inset-bottom); 
 }
 
+
+
 /* Animations */
 .fade-in { 
     animation: fadeIn 0.3s ease-in; 

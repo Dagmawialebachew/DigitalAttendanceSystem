@@ -56,6 +56,7 @@ urlpatterns = [
     path('student/profile/', views.StudentProfileView.as_view(), name='student_profile'),
     path('student/profile/edit/', views.StudentProfileEditView.as_view(), name='student_profile_edit'),
     path('course/<int:course_id>/', views.CourseDetailView.as_view(), name='course_detail'),
+path('api/notifications/unread-count/', views.UnreadNotificationCountView.as_view(), name='unread_notifications_count')
 
     # ...
     

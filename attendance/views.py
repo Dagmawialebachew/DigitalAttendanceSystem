@@ -45,25 +45,24 @@ class RegisterView(View):
         ugr = request.POST.get('ugr')
         password = request.POST.get('password')
         confirm_password = request.POST.get('confirm_password')
-        teacher_id = request.POST.get('teacher_id')  # optional validation only
 
         # Validate UGR format
         if not re.match(r'^UGR/\d{4}/\d{2}$', ugr):
             messages.error(request, "Invalid UGR format. Example: UGR/8286/17")
-            return render(request, self.template_name, {'ugr': ugr, 'teacher_id': teacher_id})
+            return render(request, self.template_name, {'ugr': ugr})
 
         # Check password match
         if password != confirm_password:
             messages.error(request, "Passwords do not match")
-            return render(request, self.template_name, {'ugr': ugr, 'teacher_id': teacher_id})
+            return render(request, self.template_name, {'ugr': ugr})
 
         # Optional: validate teacher exists
-        if teacher_id and not User.objects.filter(teacher_profile__employee_id=teacher_id, role='teacher').exists():
-            messages.error(request, "Teacher ID not found")
-            return render(request, self.template_name, {'ugr': ugr, 'teacher_id': teacher_id})
+        # if teacher_id and not User.objects.filter(teacher_profile__employee_id=teacher_id, role='teacher').exists():
+        #     messages.error(request, "Teacher ID not found")
+        #     return render(request, self.template_name, {'ugr': ugr, 'teacher_id': teacher_id})
 
         # Check if user already exists
-        email = f"{ugr}@school.com"
+        email = f"{ugr}@gmail.com"
         user, created = User.objects.get_or_create(email=email, defaults={'role': 'student'})
 
         if created:
@@ -326,27 +325,46 @@ class SubmitAttendanceView(LoginRequiredMixin, StudentRequiredMixin, View):
     template_name = 'attendance/student/submit.html'
 
     def get(self, request, session_id):
+        # Fetch active session
         session = get_object_or_404(AttendanceSession, id=session_id, status='active')
-        return render(request, self.template_name, {'session': session, 'is_valid': session.is_valid()})
+
+        if not session.is_valid():
+            messages.error(request, "This session is no longer valid.")
+            return redirect('student_dashboard')
+
+        context = {
+            'session': session,
+            'is_valid': True
+        }
+        return render(request, self.template_name, context)
 
     def post(self, request, session_id):
+        # Fetch active session
         session = get_object_or_404(AttendanceSession, id=session_id, status='active')
+
+        # Ensure student is enrolled
         if request.user not in session.course.students.all():
             messages.error(request, 'You are not enrolled in this course')
             return redirect('student_dashboard')
 
+        # Collect data
         code = request.POST.get('code', '').upper()
         ip = request.META.get('REMOTE_ADDR')
         device = request.META.get('HTTP_USER_AGENT', '')
-        success, msg = AttendanceService.submit_attendance(session, request.user, code, ip, device)
 
+        # Submit attendance using AttendanceService
+        success, msg, entry = AttendanceService.submit_attendance(session, request.user, code, ip, device)
+
+        # Broadcast the new entry if successful
+        if success and entry:
+            AttendanceService.broadcast_update(session)
+
+        # Return JSON for AJAX or redirect with messages
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': success, 'message': msg})
 
         messages.success(request, msg) if success else messages.error(request, msg)
         return redirect('student_dashboard')
-
-
 class AttendanceHistoryView(LoginRequiredMixin, StudentRequiredMixin, TemplateView):
     template_name = 'attendance/student/history.html'
 
@@ -378,6 +396,12 @@ class GamificationView(LoginRequiredMixin, StudentRequiredMixin, TemplateView):
             'all_badges': all_badges,
             'earned_badge_ids': earned_ids,
         }
+
+
+class UnreadNotificationCountView(View):
+    def get(self, request):
+        count = Notification.objects.filter(user=request.user, is_read=False).count()
+        return JsonResponse({'count': count})
 
 
 #shared profile view

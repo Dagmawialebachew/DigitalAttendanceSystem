@@ -7,6 +7,8 @@
     <meta name="theme-color" content="#0ea5e9">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+
     <title>{% block title %}Attendance System{% endblock %}</title>
 <link rel="stylesheet" href="{% static 'fontawesome/css/all.min.css' %}">
     <link rel="manifest" href="{% url 'manifest' %}">
@@ -68,7 +70,9 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
                     </svg>
                     <span class="text-xs font-medium">Alerts</span>
-                    <span id="notif-badge" class="absolute top-1 right-1/4 w-2 h-2 bg-red-500 rounded-full hidden"></span>
+<span id="notif-badge"
+      class="absolute top-1 right-[0.2rem] min-w-[1rem] h-5 px-1.5 text-xs font-semibold text-white bg-red-500 rounded-full flex items-center justify-center hidden">
+</span>
                 </a>
 
                 <a href="{% url 'profile' %}"
@@ -124,14 +128,11 @@
             themeIconDark.classList.toggle('hidden');
         });
 
-        // --- PWA Service Worker Registration ---
-        if ('serviceWorker' in navigator) {
-            // Note: The /sw.js path assumes the file is served from the project root.
-            navigator.serviceWorker.register('/sw.js').catch(() => {
-                console.error('Service Worker registration failed.');
-            });
-        }
-        
+       if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register("/sw.js")
+      .then(() => console.log("✅ Service Worker registered"))
+      .catch(err => console.error("❌ Service Worker registration failed:", err));
+  }
         // --- Real-time Notification Badge Polling (API MUST be implemented) ---
         const notifBadge = document.getElementById('notif-badge');
         const navBar = document.getElementById('bottom-nav'); // Get the nav bar element
@@ -142,9 +143,11 @@
             fetch('/api/notifications/unread-count/')
                 .then(response => response.json())
                 .then(data => {
-                    const count = data.unread_count || 0;
+                    const count = data.count || 0;
+                    console.log("Unread notifications:", count);
                     if (count > 0) {
                         notifBadge.classList.remove('hidden');
+                        notifBadge.textContent = count > 99 ? '99+' : count;
                     } else {
                         notifBadge.classList.add('hidden');
                     }

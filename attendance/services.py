@@ -10,7 +10,13 @@ from .models import (
 )
 
 
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from .models import AttendanceEntry
+
+
 class AttendanceService:
+
     @staticmethod
     def create_session(course, teacher, duration_seconds=10):
         code = AttendanceSession.generate_code()
@@ -25,22 +31,10 @@ class AttendanceService:
         )
 
         NotificationService.notify_session_started(session)
-
         return session
 
     @staticmethod
     def submit_attendance(session, student, code, ip_address, device_info):
-        if AttendanceEntry.objects.filter(session=session, student=student).exists():
-            InvalidAttempt.objects.create(
-                session=session,
-                student=student,
-                code_submitted=code,
-                ip_address=ip_address,
-                device_info=device_info,
-                reason='Duplicate submission'
-            )
-            return False, 'Already submitted for this session'
-
         if not session.is_valid():
             InvalidAttempt.objects.create(
                 session=session,
@@ -50,24 +44,26 @@ class AttendanceService:
                 device_info=device_info,
                 reason='Session expired'
             )
-            return False, 'Session has expired'
+            return False, 'Session has expired', None
+
+        if AttendanceEntry.objects.filter(session=session, student=student, is_valid=True).exists():
+            return False, 'You have already submitted attendance', None
 
         is_valid = code == session.code
 
-        entry = AttendanceEntry.objects.create(
-            session=session,
-            student=student,
-            code_submitted=code,
-            is_valid=is_valid,
-            ip_address=ip_address,
-            device_info=device_info
-        )
-
         if is_valid:
-            GamificationService.award_points(student, 10)
+            entry = AttendanceEntry.objects.create(
+                session=session,
+                student=student,
+                code_submitted=code,
+                is_valid=True,
+                ip_address=ip_address,
+                device_info=device_info
+            )
+            # optional: notify / gamify
             NotificationService.notify_attendance_marked(student, session)
             AttendanceService.broadcast_update(session)
-            return True, 'Attendance marked successfully'
+            return True, 'Attendance marked successfully', entry
         else:
             InvalidAttempt.objects.create(
                 session=session,
@@ -77,7 +73,36 @@ class AttendanceService:
                 device_info=device_info,
                 reason='Invalid code'
             )
-            return False, 'Invalid code'
+            return False, 'Invalid code', None
+
+    @staticmethod
+    def broadcast_update(session):
+        channel_layer = get_channel_layer()
+        entries = AttendanceEntry.objects.filter(session=session, is_valid=True).order_by('-timestamp')
+        if not entries.exists():
+            return
+
+        entry = entries.first()
+
+        data = {
+            'entry': {
+                'id': entry.id,
+                'student_name': entry.student.get_full_name(),
+                'student_email': getattr(entry.student, 'email', 'No Email'),
+                'timestamp': entry.timestamp.isoformat(),
+                'student_id': getattr(getattr(entry.student, 'student_profile', None), 'student_id', 'N/A'),
+                'manually_added': entry.manually_added
+            },
+            'total_present': entries.count()
+        }
+
+        async_to_sync(channel_layer.group_send)(
+            f'attendance_session_{session.id}',
+            {
+                'type': 'attendance_update',
+                'data': data
+            }
+        )
 
     @staticmethod
     def manual_override(session, student, added_by):
@@ -102,50 +127,16 @@ class AttendanceService:
         return entry
 
     @staticmethod
-    def broadcast_update(session):
-        channel_layer = get_channel_layer()
-        entries = AttendanceEntry.objects.filter(session=session, is_valid=True)
-
-        data = {
-            'session_id': session.id,
-            'total_present': entries.count(),
-            'entries': [
-                {
-                    'student_name': entry.student.get_full_name(),
-                    'student_email': entry.student.email,
-                    'timestamp': entry.timestamp.isoformat(),
-                    'manually_added': entry.manually_added
-                }
-                for entry in entries
-            ]
-        }
-
-        async_to_sync(channel_layer.group_send)(
-            f'attendance_{session.id}',
-            {
-                'type': 'attendance_update',
-                'data': data
-            }
-        )
-
-    @staticmethod
-    def end_session(session):
-        session.end_session()
-        AttendanceService.broadcast_session_ended(session)
-        EmailService.send_attendance_recap(session)
-
-    @staticmethod
     def broadcast_session_ended(session):
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
-            f'attendance_{session.id}',
+            f'attendance_session_{session.id}',
             {
                 'type': 'session_ended',
                 'data': {'session_id': session.id}
             }
         )
-
-
+        
 class GamificationService:
     @staticmethod
     def award_points(student, points):

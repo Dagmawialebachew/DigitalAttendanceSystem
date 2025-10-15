@@ -16,15 +16,27 @@
 </div>
 
 
-        {% if messages %}
-        <div class="mb-6">
-            {% for message in messages %}
-            <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 px-4 py-3 rounded-xl shake" role="alert">
-                <p class="text-sm">{{ message }}</p>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
+    {% if messages %}
+<div class="mb-6" id="message-container">
+    {% for message in messages %}
+    <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 px-4 py-3 rounded-xl shake mb-2 fade-message" role="alert">
+        <p class="text-sm">{{ message }}</p>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+  // Automatically fade out messages after 5 seconds
+  setTimeout(() => {
+    document.querySelectorAll('.fade-message').forEach(el => {
+      el.style.transition = 'opacity 0.5s ease-out';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 500); // remove after fade
+    });
+  }, 5000);
+</script>
+{% endif %}
+
 
         <form method="post" class="space-y-6">
             {% csrf_token %}

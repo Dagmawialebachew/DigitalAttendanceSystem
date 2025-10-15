@@ -6,36 +6,36 @@
 <div class="max-w-7xl mx-auto mt-10 px-4 py-6 md:py-10 fade-in">
 
     {# --- Flash Messages --- #}
-    {% if messages %}
-    <div class="mb-8 space-y-3">
-        {% for message in messages %}
-        {% with message.tags as tags %}
-        <div class="p-4 rounded-xl shadow-md flex items-center justify-between transition-opacity duration-300 js-flash-message
-             {% if 'success' in tags %} bg-green-100 dark:bg-green-900/40 border border-green-400 text-green-800 dark:text-green-200
-             {% elif 'error' in tags %} bg-red-100 dark:bg-red-900/40 border border-red-400 text-red-800 dark:text-red-200
-             {% elif 'warning' in tags %} bg-yellow-100 dark:bg-yellow-900/40 border border-yellow-500 text-yellow-800 dark:text-yellow-200
-             {% else %} bg-blue-100 dark:bg-blue-900/40 border border-blue-400 text-blue-800 dark:text-blue-200
-             {% endif %}"
-             role="alert"
-             data-auto-dismiss="{% if 'success' in tags or 'info' in tags %}true{% else %}false{% endif %}">
-            <p class="font-semibold flex items-center text-sm md:text-base">
-                {% if 'success' in tags %}<i class="fas fa-check-circle mr-3"></i>
-                {% elif 'error' in tags %}<i class="fas fa-exclamation-circle mr-3"></i>
-                {% elif 'warning' in tags %}<i class="fas fa-exclamation-triangle mr-3"></i>
-                {% else %}<i class="fas fa-info-circle mr-3"></i>
-                {% endif %}
-                {{ message }}
-            </p>
-            <button type="button" onclick="this.closest('.js-flash-message').remove()" class="text-current opacity-70 hover:opacity-100 transition-opacity flex-shrink-0 ml-4">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        {% endwith %}
-        {% endfor %}
-    </div>
-    {% endif %}
+   {% if messages %}
+<div class="mb-8 space-y-3 flash-exit" id="flash-messages" >
+    {% for message in messages %}
+    {% with message.tags as tags %}
+    <div class="p-4 rounded-xl shadow-md flex items-center justify-between js-flash-message
+        {% if 'success' in tags %} bg-green-100 dark:bg-green-900/40 border border-green-400 text-green-800 dark:text-green-200
+        {% elif 'error' in tags %} bg-red-100 dark:bg-red-900/40 border border-red-400 text-red-800 dark:text-red-200
+        {% elif 'warning' in tags %} bg-yellow-100 dark:bg-yellow-900/40 border border-yellow-500 text-yellow-800 dark:text-yellow-200
+        {% else %} bg-blue-100 dark:bg-blue-900/40 border border-blue-400 text-blue-800 dark:text-blue-200
+        {% endif %}">
+        
+        <p class="font-semibold flex items-center text-sm md:text-base">
+            {% if 'success' in tags %}<i class="fas fa-check-circle mr-3"></i>
+            {% elif 'error' in tags %}<i class="fas fa-exclamation-circle mr-3"></i>
+            {% elif 'warning' in tags %}<i class="fas fa-exclamation-triangle mr-3"></i>
+            {% else %}<i class="fas fa-info-circle mr-3"></i>{% endif %}
+            {{ message }}
+        </p>
 
-    {# --- Header --- #}
+        <button type="button" onclick="this.closest('.js-flash-message').remove()" class="text-current opacity-70 hover:opacity-100 transition-opacity flex-shrink-0 ml-4">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    {% endwith %}
+    {% endfor %}
+</div>
+{% endif %}
+
+
+    {# --- Header & Profile Alert --- #}
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-slate-200 dark:border-slate-700">
         <div class="mb-4 md:mb-0">
             <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-1">
@@ -43,14 +43,13 @@
             </h1>
             <p class="text-lg text-slate-600 dark:text-slate-400">Your current attendance and progress overview.</p>
         </div>
-        <a href="{% url 'attendance_history' %}"
-           class="bg-primary-500 hover:bg-primary-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center w-full md:w-auto">
+        <a href="{% url 'attendance_history' %}" class="bg-primary-500 hover:bg-primary-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center w-full md:w-auto">
             <i class="fas fa-calendar-check mr-2"></i> View Full History
         </a>
     </div>
 
     {% if not profile_filled %}
-    <div class="glass rounded-2xl p-4 mb-8 flex items-center justify-between border border-red-400 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 shadow-md">
+    <div class="glass rounded-2xl p-4 mb-8 flex items-center flex-wrap gap-4 justify-between border border-red-400 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 shadow-md">
         <p class="font-semibold flex items-center">
             <i class="fas fa-exclamation-triangle mr-3 text-red-600 dark:text-red-400"></i>
             Your profile is incomplete. Please ensure your full name is set up.
@@ -61,91 +60,75 @@
     </div>
     {% endif %}
 
-    {# --- Main Grid --- #}
+    {# --- Main Content Grid --- #}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
 
-        {# --- Left Column: Active Sessions --- #}
-        <div class="lg:col-span-2 space-y-6">
-
-            <div id="active-sessions-container" class="space-y-4">
-                {% if active_sessions %}
-                    {% for session in active_sessions %}
-                    <a href="{% url 'submit_attendance' session.id %}"
-                       class="block bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl p-5 hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer">
-                        <div class="flex justify-between items-start">
-                            <div class="flex-1 pr-4">
-                                <h3 class="text-xl font-extrabold mb-1">{{ session.course.name }}</h3>
-                                <p class="text-primary-100 text-sm">{{ session.course.code }} &bull; Teacher: {{ session.course.teacher.get_full_name }}</p>
-                            </div>
-                            <div class="text-right flex-shrink-0">
-                                <div class="text-3xl font-black font-mono tracking-widest bg-white/20 px-3 py-1 rounded-lg">
-                                    {{ session.code }}
-                                </div>
-                                <div class="text-sm text-primary-100 mt-1 font-semibold">TAP TO SUBMIT</div>
-                            </div>
-                        </div>
-                    </a>
-                    {% endfor %}
-                {% else %}
-                <div class="glass rounded-2xl p-6 text-center shadow-lg">
-                     <i class="far fa-clock text-6xl text-slate-400 dark:text-slate-600 mb-4"></i>
-                    <h2 class="text-xl font-bold text-slate-900 dark:text-white">No Active Sessions</h2>
-                    <p class="text-slate-600 dark:text-slate-400">Check back when your classes begin, or refresh this page.</p>
-                </div>
-                {% endif %}
-            </div>
-
-            {# --- Enrollment Prompt --- #}
-            {% if not courses %}
-            <div class="glass rounded-2xl p-6 mb-8 text-center border-2 border-red-500 bg-red-50 dark:bg-red-900/20 shadow-lg">
-                <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-3"></i>
-                <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-2">You Haven't Enrolled in Any Courses Yet</h2>
-                <p class="text-slate-600 dark:text-slate-400 mb-4">You must enroll to start marking attendance.</p>
-                
-                <form method="post" class="flex flex-col md:flex-row md:space-x-3 space-y-3 md:space-y-0 mt-4 max-w-lg mx-auto">
-                    {% csrf_token %}
-                    <input type="text" name="course_code" placeholder="Enter Course Code to Enroll"
-                            class="w-full px-4 py-2 rounded-xl border border-red-300 dark:border-red-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200">
-                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl font-semibold flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-plus mr-2"></i> Enroll Now
-                    </button>
-                </form>
-            </div>
-            {% endif %}
-
-            {# --- Recent Attendance --- #}
-            <div class="glass rounded-2xl p-6 shadow-xl">
-                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">Recent Check-ins</h2>
-                <div class="space-y-3">
-                    {% for entry in recent_entries|slice:":5" %}
-                    <div class="bg-white dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600 flex justify-between items-center hover:shadow-md transition">
-                        <div>
-                            <div class="font-semibold text-slate-900 dark:text-white">{{ entry.session.course.name }}</div>
-                            <div class="text-sm text-slate-600 dark:text-slate-400">
-                                <i class="far fa-clock mr-1"></i> {{ entry.timestamp|date:"M d, Y" }} at {{ entry.timestamp|date:"g:i A" }}
-                            </div>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <span class="text-sm font-semibold text-green-600 dark:text-green-400">
-                                +{{ entry.points_awarded|default:10 }} pts
-                            </span>
-                            <i class="fas fa-check-circle text-green-500"></i>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="text-center py-8">
-                        <i class="fas fa-clipboard-list text-6xl mx-auto text-slate-400 dark:text-slate-600 mb-4"></i>
-                        <p class="text-slate-600 dark:text-slate-400">No recent attendance records yet.</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
+     <div class="lg:col-span-2 space-y-6">
+    {% if active_sessions %}
+    <div id="activated-card" class="glass rounded-2xl p-6 border-2 border-primary-500 shadow-2xl bg-primary-50 dark:bg-slate-800">
+        <div class="flex items-center mb-4">
+            <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse mr-3"></div>
+            <h2 class="text-2xl font-bold text-slate-900 dark:text-white active-teller">Active Sessions Right Now!</h2>
         </div>
+        <div class="space-y-4" id="active-sessions-container">
+            {% for session in active_sessions %}
+            <a href="{% url 'submit_attendance' session.id %}" 
+               class="block bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl p-5 hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer active-session-card"
+               data-session-id="{{ session.id }}"
+               data-duration="{{ session.duration_seconds }}"
+               data-start-time="{{ session.start_time|date:'c' }}">
+                
+                <div class="flex justify-between items-start">
+                    <div class="flex-1 pr-4">
+                        <h3 class="text-xl font-extrabold mb-1">{{ session.course.name }}</h3>
+                        <p class="text-primary-100 text-sm">{{ session.course.code }} &bull; Teacher: {{ session.course.teacher.get_full_name }}</p>
+                        <div class="text-sm text-white mt-2 font-semibold countdown">Calculating...</div>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <div class="text-3xl font-black font-mono tracking-widest bg-white/20 px-3 py-1 rounded-lg">{{ session.code }}</div>
+                        <div class="text-sm text-primary-100 mt-1 font-semibold">TAP TO SUBMIT</div>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div id="no-active-sessions" class="glass rounded-2xl p-6 mb-6 text-center shadow-lg">
+        <i class="far fa-clock text-6xl text-slate-400 dark:text-slate-600 mb-4"></i>
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white">No Active Sessions</h2>
+        <p class="text-slate-600 dark:text-slate-400">Check back when your classes begin, or refresh this page.</p>
+    </div>
+    {% endif %}
 
-        {# --- Right Column: Stats, Notifications, Courses --- #}
+    {# --- Recent Check-ins --- #}
+    <div class="glass rounded-2xl p-6 shadow-xl">
+        <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">Recent Check-ins</h2>
+        <div class="space-y-3">
+            {% for entry in recent_entries|slice:":5" %}
+            <div class="bg-white dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600 flex justify-between items-center hover:shadow-md transition">
+                <div>
+                    <div class="font-semibold text-slate-900 dark:text-white">{{ entry.session.course.name }}</div>
+                    <div class="text-sm text-slate-600 dark:text-slate-400"><i class="far fa-clock mr-1"></i> {{ entry.timestamp|date:"M d, Y" }} at {{ entry.timestamp|date:"g:i A" }}</div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm font-semibold text-green-600 dark:text-green-400">+{{ entry.points_awarded|default:10 }} pts</span>
+                    <i class="fas fa-check-circle text-green-500"></i>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center py-8">
+                <i class="fas fa-clipboard-list text-6xl mx-auto text-slate-400 dark:text-slate-600 mb-4"></i>
+                <p class="text-slate-600 dark:text-slate-400">No recent attendance records yet.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+        {# --- Column 2: Gamification & Courses --- #}
         <div class="space-y-6 lg:col-span-1">
-            {# Gamification Stats #}
+
+            {# Progress Stats #}
             <div class="glass rounded-2xl p-6 shadow-xl">
                 <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4"><i class="fas fa-trophy mr-2 text-yellow-500"></i> Your Progress</h2>
                 <div class="grid grid-cols-2 gap-4">
@@ -166,10 +149,7 @@
                         <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">Badges Earned</div>
                     </div>
                 </div>
-                
-                <a href="{% url 'gamification' %}" class="mt-4 block text-sm font-semibold text-center text-primary-600 dark:text-primary-400 hover:text-primary-700 transition">
-                    View Badges & Leaderboard
-                </a>
+                <a href="{% url 'gamification' %}" class="mt-4 block text-sm font-semibold text-center text-primary-600 dark:text-primary-400 hover:text-primary-700 transition">View Badges & Leaderboard</a>
             </div>
 
             {# Notifications #}
@@ -181,28 +161,22 @@
                     </h2>
                     <span class="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse">{{ unread_notifications|length }}</span>
                 </div>
-                
                 <div class="space-y-3 max-h-48 overflow-y-auto">
                     {% for notification in unread_notifications|slice:":2" %}
                     <div class="bg-white dark:bg-slate-700 rounded-lg p-3 text-sm border-l-4 border-red-500 hover:bg-slate-50 dark:hover:bg-slate-600 transition">
-                        <div class="font-semibold text-slate-900 dark:text-white leading-tight">
-                            {{ notification.title|default:"System Notification" }}
-                        </div>
+                        <div class="font-semibold text-slate-900 dark:text-white leading-tight">{{ notification.title|default:"System Notification" }}</div>
                         <p class="text-slate-600 dark:text-slate-400 mt-0.5 text-xs">{{ notification.message|truncatechars:70 }}</p>
                     </div>
                     {% endfor %}
-                    <a href="{% url 'notifications_list' %}" class="text-primary-500 text-sm mt-3 block text-center font-semibold hover:text-primary-700">
-                        View All Notifications
-                    </a>
+                    <a href="{% url 'notifications_list' %}" class="text-primary-500 text-sm mt-3 block text-center font-semibold hover:text-primary-700">View All Notifications</a>
                 </div>
             </div>
             {% endif %}
 
-            {# Courses Section #}
+            {# Courses & Enrollment Form #}
             {% if courses %}
             <div class="glass rounded-2xl p-6">
                 <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4"><i class="fas fa-book mr-2 text-primary-500"></i> Your Courses</h2>
-
                 <ul class="space-y-2 mb-4 max-h-48 overflow-y-auto pr-2">
                     {% for course in courses %}
                     <li class="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 flex justify-between items-center">
@@ -210,17 +184,13 @@
                             <span class="font-semibold text-slate-900 dark:text-white">{{ course.code }}</span>
                             <div class="text-sm text-slate-600 dark:text-slate-400">{{ course.name }}</div>
                         </div>
-                        <a href="{% url 'course_detail' course_id=course.id %}" class="text-primary-500 hover:text-primary-700 text-xs font-semibold">
-                            Details
-                        </a>
+                        <a href="{% url 'course_detail' course_id=course.id %}" class="text-primary-500 hover:text-primary-700 text-xs font-semibold">Details</a>
                     </li>
                     {% endfor %}
                 </ul>
-
                 <form method="post" class="flex flex-col space-y-3 mt-4">
                     {% csrf_token %}
-                    <input type="text" name="course_code" placeholder="Enter course code to enroll"
-                            class="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200">
+                    <input type="text" name="course_code" placeholder="Enter course code to enroll" class="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200">
                     <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-semibold flex items-center justify-center">
                         <i class="fas fa-plus mr-2"></i> Enroll in New Course
                     </button>
@@ -244,62 +214,98 @@
             {% endif %}
 
         </div>
-
     </div>
-
 </div>
 {% endblock %}
-
 {% block extra_js %}
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const messages = document.querySelectorAll('.js-flash-message');
+    messages.forEach((msg, index) => {
+      const delay = 3000 + index * 1000; // staggered: 3s, 4s, 5s...
+      setTimeout(() => {
+        msg.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        msg.style.opacity = '0';
+        msg.style.transform = 'translateY(-10px)';
+        setTimeout(() => msg.remove(), 500); // remove after fade
+      }, delay);
+    });
+  });
+</script>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("✅ Script loaded and DOM ready at", new Date().toLocaleTimeString());
 
-    // Auto-dismiss flash messages
-    const messagesToDismiss = document.querySelectorAll('.js-flash-message[data-auto-dismiss="true"]');
-    const dismissTimeMs = 5000;
-    messagesToDismiss.forEach(message => {
-        setTimeout(() => {
-            message.style.transition = 'opacity 0.5s ease-out';
-            message.style.opacity = '0';
-            setTimeout(() => message.remove(), 500);
-        }, dismissTimeMs);
-    });
-
-    // --- WebSocket for Live Sessions ---
+    // 🔹 Auto-Dismiss Flash Messages
+    
+    // 🔹 WebSocket for real-time updates
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/notifications/`);
+    const wsUrl = `${protocol}//${window.location.host}/ws/notifications/`;
+    console.log("🌐 Connecting WebSocket to:", wsUrl);
+    const ws = new WebSocket(wsUrl);
 
-    ws.onmessage = function(e) {
+    ws.onopen = () => console.log("🟢 WebSocket connected at", new Date().toLocaleTimeString());
+    ws.onmessage = (e) => {
         const data = JSON.parse(e.data);
-        if (data.type === 'notification') handleNotification(data.data);
+        console.log("📩 WebSocket message received:", data);
+        if (data.type === 'notification' && data.data.type === 'session_started') {
+            console.log("🟢 New session started — reloading page...");
+            location.reload();
+        }
+    };
+    ws.onclose = () => {
+        console.warn("🔴 WebSocket closed. Reconnecting in 5s...");
+        setTimeout(() => location.reload(), 5000);
     };
 
-    function handleNotification(data) {
-        if (data.type === 'session_started') {
-            const container = document.getElementById('active-sessions-container');
-            if (!container) return;
+    // 🔹 Dynamic Countdown & Auto-Remove
+    const sessionCards = document.querySelectorAll('.active-session-card');
 
-            const sessionHTML = `
-                <a href="/submit_attendance/${data.session.id}"
-                   class="block bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl p-5 hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer">
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1 pr-4">
-                            <h3 class="text-xl font-extrabold mb-1">${data.session.course_name}</h3>
-                            <p class="text-primary-100 text-sm">${data.session.course_code} &bull; Teacher: ${data.session.teacher_name}</p>
-                        </div>
-                        <div class="text-right flex-shrink-0">
-                            <div class="text-3xl font-black font-mono tracking-widest bg-white/20 px-3 py-1 rounded-lg">
-                                ${data.session.code}
-                            </div>
-                            <div class="text-sm text-primary-100 mt-1 font-semibold">TAP TO SUBMIT</div>
-                        </div>
-                    </div>
-                </a>
-            `;
-            container.insertAdjacentHTML('afterbegin', sessionHTML);
+    sessionCards.forEach(card => {
+        const sessionId = card.dataset.sessionId;
+        const startTime = new Date(card.dataset.startTime).getTime();
+        const duration = parseInt(card.dataset.duration, 10) * 1000; // ms
+        const countdownEl = card.querySelector('.countdown');
+
+        if (isNaN(startTime) || isNaN(duration)) return;
+
+        const updateTimer = () => {
+            const now = Date.now();
+            const elapsed = now - startTime;
+            const remaining = duration - elapsed;
+
+            if (remaining <= 0) {
+                console.log(`❌ Session ID ${sessionId} expired. Removing card.`);
+                card.remove();
+                document.getElementById('activated-card').classList.add('text-center')
+                document.getElementById('activated-card').innerHTML = `  
+        <i class="far fa-clock text-6xl text-slate-400 dark:text-slate-600 mb-4"></i>
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white">No Active Sessions</h2>
+        <p class="text-slate-600 dark:text-slate-400">Check back when your classes begin, or refresh this page.</p>
+    </div>`;
+                clearInterval(timer);
+                checkNoActiveSessions();
+            } else if (countdownEl) {
+                const mins = Math.floor(remaining / 60000);
+                const secs = Math.floor((remaining % 60000) / 1000);
+                countdownEl.textContent = `${mins}:${secs.toString().padStart(2, '0')} remaining`;
+            }
+        };
+
+        updateTimer();
+        const timer = setInterval(updateTimer, 1000);
+    });
+
+    // 🔹 Check if there are no active sessions
+    function checkNoActiveSessions() {
+        const remainingCards = document.querySelectorAll('.active-session-card');
+        if (remainingCards.length === 0) {
+            const noSessionsEl = document.querySelector('#no-active-sessions');
+            if (noSessionsEl) noSessionsEl.style.display = 'block';
         }
     }
-
 });
 </script>
 {% endblock %}
