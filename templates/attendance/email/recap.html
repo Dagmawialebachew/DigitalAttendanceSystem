@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Attendance Recap</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%); padding: 30px; border-radius: 10px; color: white; text-align: center;">
+        <h1 style="margin: 0; font-size: 28px;">Attendance Recap</h1>
+        <p style="margin: 10px 0 0 0; font-size: 16px;">{{ course.name }} ({{ course.code }})</p>
+    </div>
+
+    <div style="background: #f8fafc; padding: 20px; border-radius: 10px; margin-top: 20px;">
+        <h2 style="color: #0ea5e9; margin-top: 0;">Session Summary</h2>
+        <p><strong>Date:</strong> {{ session.start_time|date:"F d, Y" }}</p>
+        <p><strong>Time:</strong> {{ session.start_time|date:"g:i A" }}</p>
+        <p><strong>Code:</strong> <span style="font-family: monospace; background: #e0f2fe; padding: 5px 10px; border-radius: 5px;">{{ session.code }}</span></p>
+    </div>
+
+    <div style="margin-top: 30px;">
+        <div style="display: inline-block; width: 48%; text-align: center; background: #dcfce7; padding: 20px; border-radius: 10px; margin-right: 2%;">
+            <div style="font-size: 36px; font-weight: bold; color: #16a34a;">{{ present_count }}</div>
+            <div style="color: #15803d; font-size: 14px;">Present</div>
+        </div>
+        <div style="display: inline-block; width: 48%; text-align: center; background: #fee2e2; padding: 20px; border-radius: 10px;">
+            <div style="font-size: 36px; font-weight: bold; color: #dc2626;">{{ absent_count }}</div>
+            <div style="color: #991b1b; font-size: 14px;">Absent</div>
+        </div>
+    </div>
+
+    {% if present_students %}
+    <div style="margin-top: 30px;">
+        <h3 style="color: #16a34a;">Present Students ({{ present_count }})</h3>
+        <ul style="list-style: none; padding: 0;">
+            {% for student in present_students %}
+            <li style="padding: 10px; background: #f0fdf4; margin-bottom: 5px; border-radius: 5px;">
+                ✓ {{ student.get_full_name }}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if absent_students %}
+    <div style="margin-top: 30px;">
+        <h3 style="color: #dc2626;">Absent Students ({{ absent_count }})</h3>
+        <ul style="list-style: none; padding: 0;">
+            {% for student in absent_students %}
+            <li style="padding: 10px; background: #fef2f2; margin-bottom: 5px; border-radius: 5px;">
+                ✗ {{ student.get_full_name }}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div style="margin-top: 30px; padding: 20px; background: #f1f5f9; border-radius: 10px; text-align: center; font-size: 14px; color: #64748b;">
+        <p>This is an automated email from the Attendance System.</p>
+        <p style="margin: 5px 0 0 0;">© 2024 Attendance System. All rights reserved.</p>
+    </div>
+</body>
+</html>

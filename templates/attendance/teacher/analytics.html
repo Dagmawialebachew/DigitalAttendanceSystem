@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Analytics{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6 fade-in">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">Analytics</h1>
+        <p class="text-slate-600 dark:text-slate-400">Track attendance trends and insights</p>
+    </div>
+
+    <div class="glass rounded-2xl p-6 mb-6">
+        <form method="get" class="flex gap-4">
+            <select name="course" onchange="this.form.submit()"
+                    class="flex-1 px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white">
+                <option value="">Select a course</option>
+                {% for course in courses %}
+                <option value="{{ course.id }}" {% if selected_course and selected_course.id == course.id %}selected{% endif %}>
+                    {{ course.name }} ({{ course.code }})
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    {% if selected_course and attendance_data %}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="glass rounded-2xl p-6">
+            <div class="text-3xl font-bold text-primary-600 dark:text-primary-400">
+                {% widthratio attendance_data|length selected_course.students.count 100 %}%
+            </div>
+            <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">Average Attendance</div>
+        </div>
+        <div class="glass rounded-2xl p-6">
+            <div class="text-3xl font-bold text-green-600 dark:text-green-400">{{ attendance_data|length }}</div>
+            <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">Total Sessions</div>
+        </div>
+        <div class="glass rounded-2xl p-6">
+            <div class="text-3xl font-bold text-slate-700 dark:text-slate-300">{{ selected_course.students.count }}</div>
+            <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">Total Students</div>
+        </div>
+    </div>
+
+    <div class="glass rounded-2xl p-6">
+        <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">Attendance Trend</h2>
+        <div class="space-y-4">
+            {% for data in attendance_data %}
+            <div class="bg-white dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="font-semibold text-slate-900 dark:text-white">{{ data.date }}</span>
+                    <span class="text-sm text-slate-600 dark:text-slate-400">{{ data.present }} / {{ data.total }}</span>
+                </div>
+                <div class="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-3 overflow-hidden">
+                    <div class="bg-gradient-to-r from-primary-500 to-primary-700 h-full rounded-full transition-all duration-500"
+                         style="width: {{ data.percentage }}%"></div>
+                </div>
+                <div class="text-right mt-1">
+                    <span class="text-sm font-semibold
+                        {% if data.percentage >= 80 %}text-green-600 dark:text-green-400
+                        {% elif data.percentage >= 60 %}text-yellow-600 dark:text-yellow-400
+                        {% else %}text-red-600 dark:text-red-400{% endif %}">
+                        {{ data.percentage|floatformat:1 }}%
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% elif selected_course %}
+    <div class="glass rounded-2xl p-12 text-center">
+        <svg class="w-20 h-20 mx-auto text-slate-400 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+        </svg>
+        <h3 class="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No sessions yet</h3>
+        <p class="text-slate-600 dark:text-slate-400">Start attendance sessions to see analytics</p>
+    </div>
+    {% else %}
+    <div class="glass rounded-2xl p-12 text-center">
+        <svg class="w-20 h-20 mx-auto text-slate-400 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+        </svg>
+        <h3 class="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">Select a course</h3>
+        <p class="text-slate-600 dark:text-slate-400">Choose a course from the dropdown above to view analytics</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

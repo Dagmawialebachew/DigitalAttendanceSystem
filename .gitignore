@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+*.log
+
+# Virtual environments
+env/
+venv/
+.venv/
+ENV/
+ENV.bak/
+venv.bak/
+
+# Django specific
+*.sqlite3
+db.sqlite3
+*.pot
+*.mo
+
+# Media and static files (optional, if you serve media via cloud/CDN or PythonAnywhere static mapping)
+
+
+# Environment variables
+.env
+*.env
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# PythonAnywhere temporary files
+*.pyc
+
+# Coverage and test reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Logs
+*.log
+
+# Node.js / front-end if any
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Mac specific
+*.DS_Store

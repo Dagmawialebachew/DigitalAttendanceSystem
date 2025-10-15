@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+
+{% block title %}Student Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto mt-10 px-4 py-6 md:py-10 fade-in">
+
+    {# ⭐ FIXED: DJANGO MESSAGES DISPLAY (Top Banner with Auto-Dismiss Logic) ⭐ #}
+    {% if messages %}
+    <div class="mb-8 space-y-3">
+        {% for message in messages %}
+        {% with message.tags as tags %}
+        
+        <div class="p-4 rounded-xl shadow-md flex items-center justify-between transition-opacity duration-300 js-flash-message
+             {% if 'success' in tags %} bg-green-100 dark:bg-green-900/40 border border-green-400 text-green-800 dark:text-green-200
+             {% elif 'error' in tags %} bg-red-100 dark:bg-red-900/40 border border-red-400 text-red-800 dark:text-red-200
+             {% elif 'warning' in tags %} bg-yellow-100 dark:bg-yellow-900/40 border border-yellow-500 text-yellow-800 dark:text-yellow-200
+             {% else %} bg-blue-100 dark:bg-blue-900/40 border border-blue-400 text-blue-800 dark:text-blue-200
+             {% endif %}"
+             role="alert"
+             {# The key fix: Conditional assignment of data attribute using pure Django template logic #}
+             data-auto-dismiss="{% if 'success' in tags or 'info' in tags %}true{% else %}false{% endif %}">
+            
+            <p class="font-semibold flex items-center text-sm md:text-base">
+                {% if 'success' in tags %}<i class="fas fa-check-circle mr-3"></i>
+                {% elif 'error' in tags %}<i class="fas fa-exclamation-circle mr-3"></i>
+                {% elif 'warning' in tags %}<i class="fas fa-exclamation-triangle mr-3"></i>
+                {% else %}<i class="fas fa-info-circle mr-3"></i>
+                {% endif %}
+                {{ message }}
+            </p>
+            {# Manual close button for all messages #}
+            <button type="button" onclick="this.closest('.js-flash-message').remove()" class="text-current opacity-70 hover:opacity-100 transition-opacity flex-shrink-0 ml-4">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        {% endwith %}
+        {% endfor %}
+    </div>
+    {% endif %}
+    {# END FIXED: DJANGO MESSAGES DISPLAY #}
+
+    {# --- 1. Header and Profile Alert --- #}
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-slate-200 dark:border-slate-700">
+        <div class="mb-4 md:mb-0">
+            <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-1">
+                Welcome back, {{ user.first_name|default:'Student' }}! 👋
+            </h1>
+            <p class="text-lg text-slate-600 dark:text-slate-400">Your current attendance and progress overview.</p>
+        </div>
+        
+        <a href="{% url 'attendance_history' %}"
+           class="bg-primary-500 hover:bg-primary-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center w-full md:w-auto">
+            <i class="fas fa-calendar-check mr-2"></i> View Full History
+        </a>
+    </div>
+
+    {% if not profile_filled %}
+    <div class="glass rounded-2xl p-4 mb-8 flex items-center justify-between border border-red-400 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 shadow-md">
+        <p class="font-semibold flex items-center">
+            <i class="fas fa-exclamation-triangle mr-3 text-red-600 dark:text-red-400"></i>
+            Your profile is incomplete. Please ensure your full name is set up.
+        </p>
+        <a href="{% url 'profile_edit' %}" class="text-sm font-bold text-primary-500 hover:text-primary-700 whitespace-nowrap">
+            Update Now &rarr;
+        </a>
+    </div>
+    {% endif %}
+
+
+
+    {# --- 2. Main Content Grid: Active Sessions, Stats, and Courses --- #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        
+        {# --- Column 1: Active Sessions (Critical Section - 2/3 width on large screens) --- #}
+        <div class="lg:col-span-2 space-y-6">
+            
+            {# 1. Active Sessions (Highest Priority) #}
+            {% if active_sessions %}
+            <div class="glass rounded-2xl p-6 border-2 border-primary-500 shadow-2xl bg-primary-50 dark:bg-slate-800">
+                <div class="flex items-center mb-4">
+                    <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse mr-3"></div>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white">Active Sessions Right Now!</h2>
+                </div>
+
+                <div class="space-y-4">
+                    {% for session in active_sessions %}
+                    <a href="{% url 'submit_attendance' session.id %}"
+                       class="block bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl p-5 hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1 pr-4">
+                                <h3 class="text-xl font-extrabold mb-1">{{ session.course.name }}</h3>
+                                <p class="text-primary-100 text-sm">{{ session.course.code }} &bull; Teacher: {{ session.course.teacher.get_full_name }}</p>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <div class="text-3xl font-black font-mono tracking-widest bg-white/20 px-3 py-1 rounded-lg">
+                                    {{ session.code }}
+                                </div>
+                                <div class="text-sm text-primary-100 mt-1 font-semibold">TAP TO SUBMIT</div>
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            {# Placeholder when no sessions are active #}
+            <div class="glass rounded-2xl p-6 mb-6 text-center shadow-lg">
+                 <i class="far fa-clock text-6xl text-slate-400 dark:text-slate-600 mb-4"></i>
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white">No Active Sessions</h2>
+                <p class="text-slate-600 dark:text-slate-400">Check back when your classes begin, or refresh this page.</p>
+            </div>
+            {% endif %}
+
+                {# --- New logic: Check if student is enrolled in courses (Enrollment Prompt) --- #}
+    {% if not courses %}
+    <div class="glass rounded-2xl p-6 mb-8 text-center border-2 border-red-500 bg-red-50 dark:bg-red-900/20 shadow-lg">
+        <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-3"></i>
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-2">You Haven't Enrolled in Any Courses Yet</h2>
+        <p class="text-slate-600 dark:text-slate-400 mb-4">You must enroll to start marking attendance.</p>
+        
+        <form method="post" class="flex flex-col md:flex-row md:space-x-3 space-y-3 md:space-y-0 mt-4 max-w-lg mx-auto">
+            {% csrf_token %}
+            <input type="text" name="course_code" placeholder="Enter Course Code to Enroll"
+                    class="w-full px-4 py-2 rounded-xl border border-red-300 dark:border-red-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200">
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl font-semibold flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-plus mr-2"></i> Enroll Now
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+
+            {# 4. Recent Attendance (Last Priority in this section) #}
+            <div class="glass rounded-2xl p-6 shadow-xl">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">Recent Check-ins</h2>
+
+                <div class="space-y-3">
+                    {% for entry in recent_entries|slice:":5" %}
+                    <div class="bg-white dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600 flex justify-between items-center hover:shadow-md transition">
+                        <div>
+                            <div class="font-semibold text-slate-900 dark:text-white">{{ entry.session.course.name }}</div>
+                            <div class="text-sm text-slate-600 dark:text-slate-400">
+                                <i class="far fa-clock mr-1"></i> {{ entry.timestamp|date:"M d, Y" }} at {{ entry.timestamp|date:"g:i A" }}
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm font-semibold text-green-600 dark:text-green-400">
+                                +{{ entry.points_awarded|default:10 }} pts
+                            </span>
+                            <i class="fas fa-check-circle text-green-500"></i>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-8">
+                        <i class="fas fa-clipboard-list text-6xl mx-auto text-slate-400 dark:text-slate-600 mb-4"></i>
+                        <p class="text-slate-600 dark:text-slate-400">No recent attendance records yet.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        {# --- Column 2: Gamification Stats, Messages & Courses (1/3 width on large screens) --- #}
+        <div class="space-y-6 lg:col-span-1">
+            
+            {# 2. Gamification Stats (High Priority) #}
+            <div class="glass rounded-2xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4"><i class="fas fa-trophy mr-2 text-yellow-500"></i> Your Progress</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-primary-50 dark:bg-slate-700 rounded-xl p-3 text-center">
+                        <div class="text-2xl font-bold text-primary-600 dark:text-primary-400">{{ gamification.total_points }}</div>
+                        <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">Total Points</div>
+                    </div>
+                    <div class="bg-yellow-50 dark:bg-slate-700 rounded-xl p-3 text-center">
+                        <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{{ gamification.streak_days }}</div>
+                        <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">Day Streak</div>
+                    </div>
+                    <div class="bg-green-50 dark:bg-slate-700 rounded-xl p-3 text-center">
+                        <div class="text-2xl font-bold text-green-600 dark:text-green-400">{{ recent_entries|length }}</div>
+                        <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">Check-ins</div>
+                    </div>
+                    <div class="bg-purple-50 dark:bg-slate-700 rounded-xl p-3 text-center">
+                        <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">{{ recent_badges|length }}</div>
+                        <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">Badges Earned</div>
+                    </div>
+                </div>
+                
+                <a href="{% url 'gamification' %}" class="mt-4 block text-sm font-semibold text-center text-primary-600 dark:text-primary-400 hover:text-primary-700 transition">
+                    View Badges & Leaderboard
+                </a>
+            </div>
+
+            {# UNREAD NOTIFICATIONS CARD (Persistent Alerts) - Use for non-transient messages #}
+            {# Assuming 'unread_notifications' is a list of objects from your backend #}
+            {% if unread_notifications %}
+            <div class="glass rounded-2xl p-6 shadow-xl">
+                <div class="flex justify-between items-center mb-4 border-b border-slate-200 dark:border-slate-700 pb-3">
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white flex items-center">
+                        <i class="fas fa-bell mr-2 text-red-500"></i> New Alerts
+                    </h2>
+                    <span class="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse">{{ unread_notifications|length }}</span>
+                </div>
+                
+                <div class="space-y-3 max-h-48 overflow-y-auto">
+                    {% for notification in unread_notifications|slice:":2" %}
+                    <div class="bg-white dark:bg-slate-700 rounded-lg p-3 text-sm border-l-4 border-red-500 hover:bg-slate-50 dark:hover:bg-slate-600 transition">
+                        <div class="font-semibold text-slate-900 dark:text-white leading-tight">
+                            {{ notification.title|default:"System Notification" }}
+                        </div>
+                        <p class="text-slate-600 dark:text-slate-400 mt-0.5 text-xs">{{ notification.message|truncatechars:70 }}</p>
+                    </div>
+                    {% endfor %}
+                    <a href="{% url 'notifications_list' %}" class="text-primary-500 text-sm mt-3 block text-center font-semibold hover:text-primary-700">
+                        View All Notifications
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+            
+            {# 3. Courses Section: Enrollment and Add Course Form (Conditional on having courses) #}
+            {% if courses %}
+            <div class="glass rounded-2xl p-6">
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4"><i class="fas fa-book mr-2 text-primary-500"></i> Your Courses</h2>
+
+                <ul class="space-y-2 mb-4 max-h-48 overflow-y-auto pr-2">
+                    {% for course in courses %}
+                    <li class="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 flex justify-between items-center">
+                        <div>
+                            <span class="font-semibold text-slate-900 dark:text-white">{{ course.code }}</span>
+                            <div class="text-sm text-slate-600 dark:text-slate-400">{{ course.name }}</div>
+                        </div>
+                        <a href="{% url 'course_detail' course_id=course.id %}" class="text-primary-500 hover:text-primary-700 text-xs font-semibold">
+                            Details
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+
+                <form method="post" class="flex flex-col space-y-3 mt-4">
+                    {% csrf_token %}
+                    <input type="text" name="course_code" placeholder="Enter course code to enroll"
+                            class="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200">
+                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-semibold flex items-center justify-center">
+                        <i class="fas fa-plus mr-2"></i> Enroll in New Course
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+            
+            {# Recent Badges: Placed last, as a secondary visual element #}
+            {% if recent_badges %}
+            <div class="glass rounded-2xl p-6">
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4"><i class="fas fa-certificate mr-2 text-purple-500"></i> New Honors</h2>
+                <div class="flex space-x-3 overflow-x-auto pb-2">
+                    {% for student_badge in recent_badges|slice:":3" %}
+                    <div class="flex-shrink-0 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl p-3 w-28 text-center shadow-lg transform hover:scale-105 transition duration-300">
+                        <div class="text-3xl mb-1 text-white">{{ student_badge.badge.icon }}</div>
+                        <div class="text-xs font-bold text-white leading-tight">{{ student_badge.badge.name }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+        
+    </div>
+
+    
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- 1. Auto-Dismiss Flash Messages ---
+        // Selects all flash messages marked for auto-dismissal
+        const messagesToDismiss = document.querySelectorAll('.js-flash-message[data-auto-dismiss="true"]');
+        const dismissTimeMs = 5000; // 5 seconds for messages to stay visible
+
+        messagesToDismiss.forEach(message => {
+            setTimeout(() => {
+                // Step 1: Start fade out animation (opacity transition handled by Tailwind utility classes)
+                message.style.transition = 'opacity 0.5s ease-out';
+                message.style.opacity = '0';
+
+                // Step 2: Remove element from DOM after fade out is complete
+                setTimeout(() => {
+                    message.remove();
+                }, 500); // 500ms to match the CSS transition time
+            }, dismissTimeMs);
+        });
+
+        // --- 2. WebSocket logic for real-time session updates ---
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws/notifications/`);
+
+        ws.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            if (data.type === 'notification') {
+                handleNotification(data.data);
+            }
+        };
+
+        function handleNotification(data) {
+            // Reload the page only when a new session starts to show the active session card immediately
+            if (data.type === 'session_started') {
+                console.log("New session started notification received. Reloading page.");
+                location.reload();
+            }
+            // You can add client-side logic for other notifications here (e.g., toast messages)
+        }
+
+        ws.onclose = function(e) {
+            console.log('WebSocket closed unexpectedly. Attempting to reconnect...');
+            // Basic reconnection logic (optional, but good for production)
+            setTimeout(function() {
+                // Re-initialize WebSocket connection here if needed
+            }, 5000);
+        };
+    });
+</script>
+{% endblock %}

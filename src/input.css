@@ -1,0 +1,130 @@
+/* 1. Tailwind Directives (Must come first for utilities to work) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------------------------------- */
+/* 2. Custom Font Definitions (Expanded to include all used weights) */
+/* ------------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/fonts/Inter/Inter_18pt-Light.ttf') format('truetype'); /* Assuming a Light or 300 weight file */
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/fonts/Inter/Inter_18pt-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/fonts/Inter/Inter_18pt-Medium.ttf') format('truetype'); /* Assuming a Medium or 500 weight file */
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/fonts/Inter/Inter_18pt-SemiBold.ttf') format('truetype'); /* Assuming a SemiBold or 600 weight file */
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/fonts/Inter/Inter_18pt-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/fonts/Inter/Inter_18pt-ExtraBold.ttf') format('truetype'); /* Assuming an ExtraBold or 800 weight file */
+  font-weight: 800;
+  font-style: normal;
+}
+
+
+/* ------------------------------------------------------------------- */
+/* 3. Global Base Styles and Custom Components (Expanded from your <style> block) */
+/* ------------------------------------------------------------------- */
+
+* { 
+    /* The font-family is already handled by Tailwind's theme config if you set it there, 
+       but keeping this here ensures it overrides defaults. */
+    font-family: 'Inter', sans-serif; 
+}
+
+body { 
+    -webkit-tap-highlight-color: transparent; 
+    overscroll-behavior: none; 
+}
+
+/* Glassmorphism Effect Component */
+.glass {
+    background: rgba(255, 255, 255, 0.7); 
+    backdrop-filter: blur(10px); 
+    /* Tailwind will need to be configured to handle backdrop-filter, 
+       but keeping the core styles here for compatibility */
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.dark .glass {
+    background: rgba(15, 23, 42, 0.7); /* slate-900 with transparency */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Mobile Safe Area */
+.bottom-nav-safe { 
+    padding-bottom: env(safe-area-inset-bottom); 
+}
+
+/* Animations */
+.fade-in { 
+    animation: fadeIn 0.3s ease-in; 
+}
+@keyframes fadeIn { 
+    from { opacity: 0; transform: translateY(10px); } 
+    to { opacity: 1; transform: translateY(0); } 
+}
+
+.pulse-success { 
+    animation: pulseSuccess 0.5s ease-out; 
+}
+@keyframes pulseSuccess { 
+    0%, 100% { transform: scale(1); } 
+    50% { transform: scale(1.05); } 
+}
+
+.shake { 
+    animation: shake 0.5s ease-out; 
+}
+@keyframes shake { 
+    0%, 100% { transform: translateX(0); } 
+    25% { transform: translateX(-10px); } 
+    75% { transform: translateX(10px); } 
+}
+
+/* Scrollbar styles (Webkit only) */
+::-webkit-scrollbar { 
+    width: 8px; 
+}
+::-webkit-scrollbar-track { 
+    background: transparent; 
+}
+::-webkit-scrollbar-thumb { 
+    background: #cbd5e1; /* slate-300 */
+    border-radius: 4px; 
+}
+.dark ::-webkit-scrollbar-thumb { 
+    background: #475569; /* slate-600 */
+}
+
+/* Mobile UX Enhancement */
+.nav-hidden { 
+    transform: translateY(100%); 
+}

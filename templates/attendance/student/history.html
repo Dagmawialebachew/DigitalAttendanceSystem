@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}Attendance History{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6 fade-in">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">Attendance History</h1>
+        <p class="text-slate-600 dark:text-slate-400">Your complete attendance record</p>
+    </div>
+
+    <div class="glass rounded-2xl p-6">
+        {% if entries %}
+        <div class="space-y-3">
+            {% for entry in entries %}
+            <div class="bg-white dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <div class="font-semibold text-slate-900 dark:text-white mb-1">{{ entry.session.course.name }}</div>
+                        <div class="flex items-center space-x-3 text-sm text-slate-600 dark:text-slate-400">
+                            <span>{{ entry.timestamp|date:"M d, Y" }}</span>
+                            <span>•</span>
+                            <span>{{ entry.timestamp|date:"g:i A" }}</span>
+                            <span>•</span>
+                            <span class="font-mono">{{ entry.session.code }}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        {% if entry.manually_added %}
+                        <span class="text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded-full">
+                            Manual
+                        </span>
+                        {% endif %}
+                        <span class="text-sm font-semibold text-green-600 dark:text-green-400">+10 pts</span>
+                        <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <svg class="w-20 h-20 mx-auto text-slate-400 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+            </svg>
+            <h3 class="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No attendance records yet</h3>
+            <p class="text-slate-600 dark:text-slate-400">Start attending sessions to build your history</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

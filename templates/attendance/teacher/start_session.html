@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Start Session{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 fade-in">
+    <a href="{% url 'teacher_dashboard' %}" class="inline-flex items-center text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 mb-6">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+        Back to Dashboard
+    </a>
+
+    <div class="glass rounded-2xl p-8">
+        <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">Start Attendance Session</h1>
+        <p class="text-slate-600 dark:text-slate-400 mb-8">{{ course.name }} ({{ course.code }})</p>
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+
+            <div>
+                <label for="duration" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                    Code Duration (seconds)
+                </label>
+                <input type="number" name="duration" id="duration" value="10" min="5" max="60"
+                       class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200">
+                <p class="text-sm text-slate-500 dark:text-slate-500 mt-2">
+                    Recommended: 10 seconds for quick attendance
+                </p>
+            </div>
+
+            <div class="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-xl p-4">
+                <h3 class="font-semibold text-primary-900 dark:text-primary-200 mb-2">Session Details</h3>
+                <ul class="text-sm text-primary-800 dark:text-primary-300 space-y-1">
+                    <li>✓ A unique 4-digit code will be generated</li>
+                    <li>✓ Code will be valid for the specified duration</li>
+                    <li>✓ Students enrolled: {{ course.students.count }}</li>
+                    <li>✓ Real-time attendance tracking enabled</li>
+                </ul>
+            </div>
+
+            <button type="submit"
+                    class="w-full bg-gradient-to-r from-primary-500 to-primary-700 hover:from-primary-600 hover:to-primary-800 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+                <svg class="w-5 h-5 inline-block mr-2 -mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                </svg>
+                Start Session Now
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

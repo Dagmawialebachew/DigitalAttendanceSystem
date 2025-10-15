@@ -1,0 +1,27 @@
+ATTENDANCE RECAP
+{{ course.name }} ({{ course.code }})
+
+SESSION SUMMARY
+Date: {{ session.start_time|date:"F d, Y" }}
+Time: {{ session.start_time|date:"g:i A" }}
+Code: {{ session.code }}
+
+ATTENDANCE STATISTICS
+Present: {{ present_count }}
+Absent: {{ absent_count }}
+Total: {{ total_count }}
+
+{% if present_students %}
+PRESENT STUDENTS ({{ present_count }})
+{% for student in present_students %}✓ {{ student.get_full_name }}
+{% endfor %}
+{% endif %}
+
+{% if absent_students %}
+ABSENT STUDENTS ({{ absent_count }})
+{% for student in absent_students %}✗ {{ student.get_full_name }}
+{% endfor %}
+{% endif %}
+
+---
+This is an automated email from the Attendance System.

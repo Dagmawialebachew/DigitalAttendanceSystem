@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}Edit Profile{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto px-4 py-6 fade-in">
+    <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-6">
+        <i class="fas fa-user-edit text-primary-500 mr-3"></i> Edit Your Profile
+    </h1>
+
+    {# Consistent 'glass' card style #}
+    <div class="glass rounded-2xl p-6 md:p-8 shadow-xl">
+        
+        {# Ensure the form supports file uploads (for the avatar) #}
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="space-y-4">
+                
+                {# Profile Avatar Display #}
+                <div class="flex items-center space-x-4 mb-4">
+                    {% if user.avatar %}
+                        <img src="{{ user.avatar.url }}" alt="Avatar" class="w-16 h-16 rounded-full object-cover border-2 border-primary-500">
+                    {% else %}
+                        <div class="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
+                            {{ user.first_name.0 }}{{ user.last_name.0 }}
+                        </div>
+                    {% endif %}
+                    <p class="text-slate-600 dark:text-slate-400">Update your details below.</p>
+                </div>
+
+                {# Render the form fields using the add_class filter #}
+                {% for field in form %}
+                    <div class="form-group">
+                        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                            {{ field.label }}
+                        </label>
+                        
+                        {# 🌟 Use the add_class filter here 🌟 #}
+                        {# This class string combines the styling from your previous inline CSS #}
+                        {% if field.field.widget.input_type == 'checkbox' %}
+                            {{ field }}
+                        {% else %}
+                            {% render_field field class="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 transition-colors duration-150" %}
+                        {% endif %}
+                        
+                        {% if field.help_text %}
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ field.help_text }}</p>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <p class="text-sm text-red-500 mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+
+            </div>
+
+            <div class="flex justify-end space-x-3 mt-8">
+                <a href="{% url 'profile' %}"
+                   class="px-5 py-2.5 text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 rounded-xl font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 transition duration-200 text-center">
+                    Cancel
+                </a>
+                <button type="submit" 
+                        class="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition duration-200 shadow-lg shadow-primary-500/50">
+                    <i class="fas fa-save mr-2"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# The style block is no longer needed since classes are applied directly to the fields #}
+{% endblock %}

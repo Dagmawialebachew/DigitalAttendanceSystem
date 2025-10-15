@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}Teacher Profile{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-6 md:py-10 fade-in">
+    
+    {# --- Profile Header and Details (Top Card) --- #}
+    <div class="glass rounded-2xl p-6 md:p-8 mb-6 shadow-xl">
+        <div class="flex flex-col md:flex-row items-center md:space-x-6">
+            
+            {# Profile Avatar/Initials #}
+            <div class="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg flex-shrink-0 mb-4 md:mb-0">
+                {{ user.first_name.0 }}{{ user.last_name.0 }}
+            </div>
+            
+            {# Name and Role Details #}
+            <div class="flex-1 text-center md:text-left">
+                <h1 class="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-1">
+                    {{ user.get_full_name }}
+                </h1>
+                <p class="text-sm text-slate-600 dark:text-slate-400 mb-3">{{ user.email }}</p>
+                
+                <div class="flex flex-wrap justify-center md:justify-start gap-2">
+                    <span class="bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-3 py-1 rounded-full text-sm font-semibold">
+                        {{ user.get_role_display }}
+                    </span>
+                    {% if user.teacher_profile %}
+                    <span class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1 rounded-full text-sm font-semibold">
+                        ID: {{ user.teacher_profile.employee_id|default:"N/A" }}
+                    </span>
+                    <span class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1 rounded-full text-sm font-semibold">
+                        {{ user.teacher_profile.department }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Edit Profile Button #}
+            <a href="{% url 'profile_edit' %}"
+               class="mt-4 md:mt-0 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-xl font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors duration-200 flex-shrink-0">
+                <i class="fas fa-edit mr-2"></i> Edit Profile
+            </a>
+        </div>
+    </div>
+
+    {# --- Main Content Grid --- #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        
+        {# --- Column 1: Courses Management (Spanning 2 columns on large screens) --- #}
+        <div class="lg:col-span-2 glass rounded-2xl p-6 shadow-xl">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-200 dark:border-slate-700 pb-3">
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white">Courses Taught ({{ courses|length }})</h2>
+                <a href="{% url 'course_create' %}"
+                   class="flex items-center bg-primary-500 hover:bg-primary-600 text-white px-3 py-1.5 rounded-xl text-sm font-semibold transition-colors duration-200">
+                    <i class="fas fa-plus mr-1"></i> Add New
+                </a>
+            </div>
+            
+            {% if courses %}
+            <div class="space-y-3">
+                {% for course in courses %}
+                <div class="bg-white dark:bg-slate-700 rounded-xl p-3 border border-slate-200 dark:border-slate-600 flex justify-between items-center transition duration-200 hover:shadow-md">
+                    <div class="flex-1">
+                        <div class="font-semibold text-slate-900 dark:text-white leading-tight">
+                            <a href="{% url 'session_detail' session_id=course.sessions.first.id %}" class="hover:text-primary-500 transition-colors">
+                                {{ course.name }}
+                            </a>
+                        </div>
+                        <div class="text-xs text-slate-600 dark:text-slate-400">
+                            {{ course.code }} &bull; {{ course.students.count }} students
+                        </div>
+                    </div>
+                    
+                    {# Course Actions #}
+                    <div class="flex space-x-2 flex-shrink-0 ml-4">
+                        <a href="{% url 'course_update' pk=course.pk %}" 
+                           title="Edit Course"
+                           class="text-primary-500 hover:text-primary-700 p-1 rounded-full hover:bg-primary-100 dark:hover:bg-primary-900/50 transition">
+                            <i class="fas fa-pen text-sm"></i>
+                        </a>
+                        <a href="{% url 'course_delete' pk=course.pk %}" 
+                           title="Delete Course"
+                           class="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition">
+                            <i class="fas fa-trash-alt text-sm"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg text-center">
+                <p class="text-slate-600 dark:text-slate-400">You are not currently teaching any courses. Start by creating one!</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {# --- Column 2: Quick Actions & Notifications --- #}
+        <div class="space-y-6">
+            
+            {# Quick Actions #}
+            <div class="glass rounded-2xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4">Quick Links</h2>
+                <div class="space-y-3">
+                    <a href="{% url 'teacher_dashboard' %}"
+                       class="block bg-primary-500 hover:bg-primary-600 text-white px-4 py-3 rounded-xl font-semibold transition-colors duration-200 text-center">
+                        <i class="fas fa-tachometer-alt mr-2"></i> Dashboard
+                    </a>
+                    <a href="{% url 'analytics' %}"
+                       class="block bg-slate-700 hover:bg-slate-800 text-white px-4 py-3 rounded-xl font-semibold transition-colors duration-200 text-center">
+                        <i class="fas fa-chart-line mr-2"></i> View Analytics
+                    </a>
+                    <a href="{% url 'logout' %}"
+                       class="block bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-semibold transition-colors duration-200 text-center">
+                        <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                    </a>
+                </div>
+            </div>
+
+            {# Recent Notifications #}
+            <div class="glass rounded-2xl p-6 shadow-xl">
+                <div class="flex justify-between items-center mb-4 border-b border-slate-200 dark:border-slate-700 pb-3">
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white">Unread Notifications</h2>
+                    <span class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">{{ notifications|length }}</span>
+                </div>
+                
+                {% if notifications %}
+                <div class="space-y-3 max-h-48 overflow-y-auto">
+                    {% for notification in notifications %}
+                    <div class="bg-white dark:bg-slate-700 rounded-lg p-3 text-sm border-l-4 border-primary-500">
+                        <div class="font-semibold text-slate-900 dark:text-white">{{ notification.title }}</div>
+                        <p class="text-slate-600 dark:text-slate-400 mt-0.5">{{ notification.message|truncatechars:70 }}</p>
+                        <a href="{% url 'notifications' %}" class="text-primary-500 text-xs mt-1 block">View All</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-slate-600 dark:text-slate-400 text-center">All caught up! No new notifications.</p>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

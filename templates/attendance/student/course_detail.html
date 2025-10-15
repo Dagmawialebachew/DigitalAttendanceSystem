@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Course: {{ course.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-6 fade-in">
+    <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-4">
+        <i class="fas fa-book-open text-primary-500 mr-3"></i> {{ course.name }} ({{ course.code }})
+    </h1>
+    <p class="text-slate-600 dark:text-slate-400 mb-6">Taught by: {{ course.teacher.get_full_name }}</p>
+
+    <div class="glass rounded-2xl p-6 md:p-8 shadow-xl">
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4 border-b pb-2">Your Attendance History</h2>
+        
+        {% if attendance_records %}
+            <div class="space-y-3">
+            {% for entry in attendance_records %}
+                <div class="p-3 rounded-lg flex justify-between items-center 
+                            {% if entry.is_valid %}bg-green-50 dark:bg-green-900/20{% else %}bg-red-50 dark:bg-red-900/20{% endif %}">
+                    <div>
+                        <p class="font-semibold text-slate-900 dark:text-white">Session on {{ entry.session.start_time|date:"F d, Y" }}</p>
+                        <p class="text-sm {% if entry.is_valid %}text-green-700 dark:text-green-300{% else %}text-red-700 dark:text-red-300{% endif %}">
+                            <i class="fas {% if entry.is_valid %}fa-check-circle{% else %}fa-times-circle{% endif %} mr-1"></i> 
+                            {{ entry.timestamp|date:"g:i A" }}
+                        </p>
+                    </div>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">
+                        Code: {{ entry.code_submitted }}
+                    </span>
+                </div>
+            {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-slate-600 dark:text-slate-400 text-center py-4">No attendance records found for this course.</p>
+        {% endif %}
+
+        <div class="mt-6 flex justify-end">
+            <a href="{% url 'student_profile' %}" class="text-primary-600 hover:text-primary-700 font-semibold transition">
+                &larr; Back to Profile
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

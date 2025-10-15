@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Rewards & Gamification{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6 fade-in">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">Rewards & Achievements</h1>
+        <p class="text-slate-600 dark:text-slate-400">Track your progress and earn badges</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="glass rounded-2xl p-6 text-center">
+            <div class="text-6xl font-black bg-gradient-to-r from-primary-500 to-primary-700 bg-clip-text text-transparent mb-2">
+                {{ gamification.total_points }}
+            </div>
+            <div class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Total Points</div>
+            <div class="mt-4 text-xs text-slate-500 dark:text-slate-500">+10 points per attendance</div>
+        </div>
+
+        <div class="glass rounded-2xl p-6 text-center">
+            <div class="text-6xl font-black bg-gradient-to-r from-yellow-500 to-yellow-700 bg-clip-text text-transparent mb-2">
+                {{ gamification.streak_days }}
+            </div>
+            <div class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Day Streak</div>
+            <div class="mt-4">
+                <div class="flex justify-center space-x-1">
+                    {% for i in "12345678910"|make_list %}
+                    <div class="w-2 h-8 rounded-full {% if forloop.counter <= gamification.streak_days %}bg-yellow-500{% else %}bg-slate-300 dark:bg-slate-700{% endif %}"></div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="glass rounded-2xl p-6 text-center">
+            <div class="text-6xl font-black bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent mb-2">
+                {{ badges.count }}
+            </div>
+            <div class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Badges Earned</div>
+            <div class="mt-4 text-xs text-slate-500 dark:text-slate-500">Keep attending to earn more!</div>
+        </div>
+    </div>
+
+    {% if badges %}
+    <div class="glass rounded-2xl p-6 mb-8">
+        <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">Your Badges</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {% for student_badge in badges %}
+            <div class="bg-gradient-to-br
+                {% if student_badge.badge.badge_type == 'bronze' %}from-orange-400 to-orange-600
+                {% elif student_badge.badge.badge_type == 'silver' %}from-slate-400 to-slate-600
+                {% elif student_badge.badge.badge_type == 'gold' %}from-yellow-400 to-yellow-600
+                {% else %}from-purple-400 to-purple-600{% endif %}
+                rounded-xl p-4 text-center shadow-lg hover:scale-110 transition-transform duration-200">
+                <div class="text-5xl mb-2">{{ student_badge.badge.icon }}</div>
+                <div class="text-xs font-bold text-white mb-1">{{ student_badge.badge.name }}</div>
+                <div class="text-xs text-white opacity-75">{{ student_badge.earned_at|date:"M d" }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="glass rounded-2xl p-6 shadow-xl">
+    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">Badges & Achievements</h2>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {% for badge in all_badges %}
+            
+            {# Check if the current badge ID is in the list of earned IDs (FIXES THE ERROR) #}
+            {% if badge.id in earned_badge_ids %}
+                
+                {# --- EARNED BADGE TEMPLATE (Full Color, Solid Border) --- #}
+                <div class="bg-white dark:bg-slate-700 rounded-xl p-4 shadow-md flex items-center space-x-4 border-2 border-primary-500 fade-in pulse-success">
+                    <div class="text-5xl text-primary-600 dark:text-primary-400">{{ badge.icon }}</div>
+                    <div class="flex-1">
+                        <h3 class="font-extrabold text-lg text-slate-900 dark:text-white">{{ badge.name }}</h3>
+                        <p class="text-sm text-slate-700 dark:text-slate-300">🎉 Earned! {{ badge.description }}</p>
+                    </div>
+                </div>
+
+            {% else %}
+            
+                {# --- UN-EARNED/AVAILABLE BADGE TEMPLATE (Faded, Dashed Border) --- #}
+                <div class="bg-white dark:bg-slate-700 rounded-xl p-4 border-2 border-dashed border-slate-300 dark:border-slate-600 opacity-60 hover:opacity-100 transition duration-150">
+                    <div class="flex items-center space-x-4">
+                        <div class="text-5xl opacity-50">{{ badge.icon }}</div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-slate-900 dark:text-white">{{ badge.name }}</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mb-2">{{ badge.description }}</p>
+                            
+                            <div class="flex flex-wrap gap-2 text-xs mt-2">
+                                {% if badge.required_points > 0 %}
+                                <span class="bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-1 rounded-full font-semibold">
+                                    {{ badge.required_points }} Points
+                                </span>
+                                {% endif %}
+                                {% if badge.required_streak > 0 %}
+                                <span class="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded-full font-semibold">
+                                    {{ badge.required_streak }} Day Streak
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            {% endif %}
+        {% endfor %}
+        
+    </div>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-6 fade-in">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">Notifications</h1>
+        <p class="text-slate-600 dark:text-slate-400">Stay updated with your attendance activities</p>
+    </div>
+
+    <div class="glass rounded-2xl p-6">
+        {% if notifications %}
+        <div class="space-y-3">
+            {% for notification in notifications %}
+            <div class="bg-white dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600 {% if not notification.is_read %}border-l-4 border-l-primary-500{% endif %}">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <span class="px-2 py-1 rounded-full text-xs font-semibold
+                                {% if notification.notification_type == 'session_started' %}bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300
+                                {% elif notification.notification_type == 'attendance_marked' %}bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300
+                                {% elif notification.notification_type == 'badge_earned' %}bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300
+                                {% else %}bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300{% endif %}">
+                                {{ notification.get_notification_type_display }}
+                            </span>
+                            {% if not notification.is_read %}
+                            <span class="w-2 h-2 bg-primary-500 rounded-full"></span>
+                            {% endif %}
+                        </div>
+                        <h3 class="font-semibold text-slate-900 dark:text-white mb-1">{{ notification.title }}</h3>
+                        <p class="text-sm text-slate-600 dark:text-slate-400 mb-2">{{ notification.message }}</p>
+                        <div class="text-xs text-slate-500 dark:text-slate-500">{{ notification.created_at|timesince }} ago</div>
+                    </div>
+                    {% if not notification.is_read %}
+                    <button onclick="markAsRead({{ notification.id }})"
+                            class="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-semibold">
+                        Mark read
+                    </button>
+                    {% endif %}
+                </div>
+                {% if notification.link %}
+                <a href="{{ notification.link }}"
+                   class="block mt-3 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-semibold">
+                    View details →
+                </a>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <svg class="w-20 h-20 mx-auto text-slate-400 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <h3 class="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No notifications yet</h3>
+            <p class="text-slate-600 dark:text-slate-400">You'll see updates about your attendance here</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function markAsRead(notificationId) {
+        try {
+            const response = await fetch(`/notifications/${notificationId}/read/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                }
+            });
+
+            if (response.ok) {
+                location.reload();
+            }
+        } catch (error) {
+            console.error('Error marking notification as read:', error);
+        }
+    }
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/notifications/`);
+
+    ws.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'notification') {
+            document.getElementById('notif-badge').classList.remove('hidden');
+        }
+    };
+</script>
+{% endblock %}
