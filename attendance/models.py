@@ -66,6 +66,30 @@ class User(AbstractUser):
     @property
     def is_admin_role(self):
         return self.role == 'admin'
+    
+    @property
+    def full_name(self):
+        """
+        Returns the user's full name, otherwise username, 
+        otherwise linked student ID if a StudentProfile exists, otherwise email.
+        """
+        # 1️⃣ Full name
+        if self.first_name or self.last_name:
+            return f"{self.first_name} {self.last_name}".strip()
+        
+        # 2️⃣ Username
+        if self.username:
+            return self.username
+        
+        # 3️⃣ Student ID from profile
+        try:
+            if hasattr(self, 'student_profile') and self.student_profile.student_id:
+                return self.student_profile.student_id
+        except StudentProfile.DoesNotExist:
+            pass
+        
+        # 4️⃣ Fallback to email
+        return self.email
 
 
 class TeacherProfile(models.Model):
