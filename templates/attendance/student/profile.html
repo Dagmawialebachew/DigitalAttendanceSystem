@@ -42,11 +42,15 @@
     <div class="glass rounded-2xl p-6 md:p-8 mb-6 shadow-xl">
         <div class="flex flex-col md:flex-row items-center md:space-x-6">
 
-            {# Avatar / Initials #}
-            <div class="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg flex-shrink-0 mb-4 md:mb-0">
-                {{ user.first_name.0|default:"" }}{{ user.last_name.0|default:"" }}
-            </div>
-
+            <div class="flex items-center space-x-4 mb-4">
+                    {% if user.avatar %}
+                        <img src="{{ user.avatar.url }}" alt="Avatar" class="w-16 h-16 rounded-full object-cover border-2 border-primary-500">
+                    {% else %}
+                        <div class="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
+                            {{ user.first_name.0 }}{{ user.last_name.0 }}
+                        </div>
+                    {% endif %}
+                </div>
             {# Name & Role #}
             <div class="flex-1 text-center md:text-left">
                 <h1 class="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-1">
@@ -76,7 +80,7 @@
 
             {# Action Buttons: Edit & Logout #}
             <div class="flex flex-col sm:flex-row md:flex-col lg:flex-row space-y-2 sm:space-y-0 sm:space-x-3 md:space-x-0 md:space-y-2 lg:space-x-3 lg:space-y-0 mt-4 md:mt-0 flex-shrink-0">
-                <a href="{% url 'profile_edit' %}"
+                <a href="{% url 'student_profile_edit' %}"
                    class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-xl font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors duration-200 flex items-center justify-center">
                     <i class="fas fa-edit mr-2"></i> Edit Profile
                 </a>

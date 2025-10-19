@@ -5,9 +5,13 @@
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 py-6 fade-in">
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-            Welcome, {{ user.first_name }}!
-        </h1>
+       <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-1">
+    {% if user.last_login == None %}
+        Welcome, {{ user.first_name|default:'Teacher' }}! 🎉
+    {% else %}
+        Welcome back, {{ user.first_name|default:'Teacher' }}! 👋
+    {% endif %}
+</h1>
         <p class="text-slate-600 dark:text-slate-400">Manage your attendance sessions</p>
     </div>
 

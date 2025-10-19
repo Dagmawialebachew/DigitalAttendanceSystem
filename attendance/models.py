@@ -113,7 +113,7 @@ class StudentProfile(models.Model):
 # ------------------- Remaining models unchanged -------------------
 class Course(models.Model):
     name = models.CharField(max_length=200)
-    code = models.CharField(max_length=6, unique=True)  # short code
+    code = models.CharField(max_length=4, unique=True)  # short code
     description = models.TextField(blank=True)
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='courses_taught')
     students = models.ManyToManyField(User, related_name='courses_enrolled', blank=True)
@@ -219,20 +219,23 @@ class GamificationPoints(models.Model):
         return f"{self.student.get_full_name()} - {self.total_points} points"
 
     def add_points(self, points):
+        """Add points and update daily attendance streak."""
         self.total_points += points
-
         today = timezone.now().date()
-        if self.last_attendance_date:
-            days_diff = (today - self.last_attendance_date).days
-            if days_diff == 1:
-                self.streak_days += 1
-            elif days_diff > 1:
-                self.streak_days = 1
-        else:
-            self.streak_days = 1
 
-        self.last_attendance_date = today
+        # Only update streak if this is a new attendance day
+        if self.last_attendance_date != today:
+            if self.last_attendance_date:
+                days_diff = (today - self.last_attendance_date).days
+                # Continue streak if attended yesterday, else reset
+                self.streak_days = self.streak_days + 1 if days_diff == 1 else 1
+            else:
+                self.streak_days = 1
+
+            self.last_attendance_date = today
+
         self.save()
+
 
 
 class Badge(models.Model):
@@ -269,12 +272,16 @@ class StudentBadge(models.Model):
 
 class Notification(models.Model):
     NOTIFICATION_TYPES = (
-        ('session_started', 'Session Started'),
-        ('attendance_marked', 'Attendance Marked'),
-        ('late_warning', 'Late Warning'),
-        ('absent_alert', 'Absent Alert'),
-        ('badge_earned', 'Badge Earned'),
-    )
+    ('session_started', 'Session Started'),
+    ('attendance_marked', 'Attendance Marked'),
+    ('late_warning', 'Late Warning'),
+    ('absent_alert', 'Absent Alert'),
+    ('badge_earned', 'Badge Earned'),
+    ('session_summary', 'Session Summary'),
+    ('unusual_attendance', 'Unusual Attendance'),
+    ('student_milestone', 'Student Milestone'),
+    ('absence_pattern', 'Absence Pattern'),
+)
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
     notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)

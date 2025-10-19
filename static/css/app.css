@@ -652,8 +652,8 @@ video {
   right: 1rem;
 }
 
-.right-\[0\.2rem\] {
-  right: 0.2rem;
+.right-\[30\%\] {
+  right: 30%;
 }
 
 .top-1 {
@@ -662,6 +662,42 @@ video {
 
 .top-4 {
   top: 1rem;
+}
+
+.right-\[50\%\] {
+  right: 50%;
+}
+
+.right-\[40\] {
+  right: 40;
+}
+
+.right-\[40\%\] {
+  right: 40%;
+}
+
+.right-\[35\%\] {
+  right: 35%;
+}
+
+.right-\[3\] {
+  right: 3;
+}
+
+.right-\[37\%\] {
+  right: 37%;
+}
+
+.right-\[42\] {
+  right: 42;
+}
+
+.right-\[42\%\] {
+  right: 42%;
+}
+
+.right-\[45\%\] {
+  right: 45%;
 }
 
 .z-40 {
@@ -1197,6 +1233,11 @@ video {
   background-color: rgb(219 234 254 / var(--tw-bg-opacity, 1));
 }
 
+.bg-gray-100 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(243 244 246 / var(--tw-bg-opacity, 1));
+}
+
 .bg-green-100 {
   --tw-bg-opacity: 1;
   background-color: rgb(220 252 231 / var(--tw-bg-opacity, 1));
@@ -1313,11 +1354,6 @@ video {
 .bg-yellow-500 {
   --tw-bg-opacity: 1;
   background-color: rgb(234 179 8 / var(--tw-bg-opacity, 1));
-}
-
-.bg-gray-100 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(243 244 246 / var(--tw-bg-opacity, 1));
 }
 
 .bg-opacity-50 {
@@ -2370,6 +2406,11 @@ body {
   background-color: rgb(30 58 138 / 0.4);
 }
 
+.dark\:bg-gray-700:is(.dark *) {
+  --tw-bg-opacity: 1;
+  background-color: rgb(55 65 81 / var(--tw-bg-opacity, 1));
+}
+
 .dark\:bg-green-900\/20:is(.dark *) {
   background-color: rgb(20 83 45 / 0.2);
 }
@@ -2427,11 +2468,6 @@ body {
 
 .dark\:bg-yellow-900\/40:is(.dark *) {
   background-color: rgb(113 63 18 / 0.4);
-}
-
-.dark\:bg-gray-700:is(.dark *) {
-  --tw-bg-opacity: 1;
-  background-color: rgb(55 65 81 / var(--tw-bg-opacity, 1));
 }
 
 .dark\:from-slate-900:is(.dark *) {
@@ -2582,6 +2618,12 @@ body {
   color: rgb(56 189 248 / var(--tw-text-opacity, 1));
 }
 
+@media not all and (min-width: 768px) {
+  .max-md\:right-\[30\%\] {
+    right: 30%;
+  }
+}
+
 @media (min-width: 640px) {
   .sm\:flex-row {
     flex-direction: row;
@@ -2615,14 +2657,6 @@ body {
     margin-top: 0px;
   }
 
-  .md\:h-24 {
-    height: 6rem;
-  }
-
-  .md\:w-24 {
-    width: 6rem;
-  }
-
   .md\:w-auto {
     width: auto;
   }
@@ -2645,6 +2679,10 @@ body {
 
   .md\:flex-col {
     flex-direction: column;
+  }
+
+  .md\:items-start {
+    align-items: flex-start;
   }
 
   .md\:items-center {

@@ -102,6 +102,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.user_id = self.scope['user'].id
         self.room_group_name = f'notifications_{self.user_id}'
+        print('we are sending to',self.room_group_name)
 
         await self.channel_layer.group_add(
             self.room_group_name,

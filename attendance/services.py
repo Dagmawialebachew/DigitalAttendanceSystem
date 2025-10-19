@@ -125,6 +125,56 @@ class AttendanceService:
 
         AttendanceService.broadcast_update(session)
         return entry
+    
+    @staticmethod
+    def end_session(session):
+        session.end_session()
+        AttendanceService.broadcast_session_ended(session)
+        EmailService.send_attendance_recap(session)
+        TeacherNotificationService.notify_session_summary(session.teacher, session)
+            # After summary
+        recent_sessions = AttendanceSession.objects.filter(
+            course=session.course,
+            teacher=session.teacher
+        ).exclude(id=session.id).order_by('-start_time')[:5]
+
+        if recent_sessions.exists():
+            total_rate = 0
+            count = 0
+            for s in recent_sessions:
+                students = s.course.students.all()
+                total_students = students.count()
+                marked = s.entries.filter(status='PRESENT').count()
+                if total_students > 0:
+                    total_rate += (marked / total_students * 100)
+                    count += 1
+
+            avg_rate = (total_rate / count) if count > 0 else 0
+            TeacherNotificationService.notify_unusual_attendance(session.teacher, session, avg_rate)
+            
+        
+                    # Inside end_session() after summary + unusual detection
+            students = session.course.students.all()
+            for student in students:
+                # Count last 3 sessions (including current)
+                recent_sessions = AttendanceSession.objects.filter(
+                    course=session.course,
+                    teacher=session.teacher
+                ).order_by('-start_time')[:3]
+
+                consecutive_misses = 0
+                for s in recent_sessions:
+                    marked = AttendanceEntry.objects.filter(session=s, student=student, is_valid=True).exists()
+                    if not marked:
+                        consecutive_misses += 1
+                    else:
+                        break  # break streak if present
+
+                TeacherNotificationService.notify_absence_pattern(session.teacher, student, consecutive_misses)
+
+
+
+
 
     @staticmethod
     def broadcast_session_ended(session):
@@ -136,6 +186,7 @@ class AttendanceService:
                 'data': {'session_id': session.id}
             }
         )
+        
         
 class GamificationService:
     @staticmethod
@@ -156,6 +207,8 @@ class GamificationService:
             if not StudentBadge.objects.filter(student=student, badge=badge).exists():
                 StudentBadge.objects.create(student=student, badge=badge)
                 NotificationService.notify_badge_earned(student, badge)
+                TeacherNotificationService.notify_student_milestone(student.course.teacher, student, badge)
+
 
 
 class NotificationService:
@@ -215,6 +268,65 @@ class NotificationService:
             message=f'Congratulations! You earned the {badge.name} badge!',
             link='/student/gamification/'
         )
+
+
+class TeacherNotificationService(NotificationService):
+
+    @staticmethod
+    def notify_session_summary(teacher, session):
+        students = session.course.students.all()
+        total_students = students.count()
+        marked = session.entries.filter(is_valid=True).count()
+        absent = total_students - marked
+
+        attendance_rate = (marked / total_students * 100) if total_students > 0 else 0
+
+        NotificationService.create_notification(
+            user=teacher,
+            notification_type='session_summary',
+            title=f'Attendance Summary: {session.course.name}',
+            message=f'{marked} present, {absent} absent ({attendance_rate:.1f}% attendance) for today’s session.',
+            link=f'/teacher/session/{session.id}/summary/'
+        )
+
+    @staticmethod
+    def notify_unusual_attendance(teacher, session, avg_attendance_rate):
+        students = session.course.students.all()
+        total_students = students.count()
+        marked = session.entries.filter(is_valid=True).count()
+        today_rate = (marked / total_students * 100) if total_students > 0 else 0
+
+        # detect unusual dip (e.g. more than 15% lower than average)
+        if today_rate < (avg_attendance_rate - 15):
+            NotificationService.create_notification(
+                user=teacher,
+                notification_type='unusual_attendance',
+                title='Unusual Attendance Detected',
+                message=f"Today's attendance for {session.course.name} is {today_rate:.1f}%, "
+                        f"below your usual {avg_attendance_rate:.1f}%.",
+                link=f'/teacher/session/{session.id}/'
+            )
+
+    @staticmethod
+    def notify_student_milestone(teacher, student, milestone):
+        NotificationService.create_notification(
+            user=teacher,
+            notification_type='student_milestone',
+            title='Student Milestone Reached',
+            message=f'{student.full_name} has achieved the milestone: "{milestone.name}".',
+            link=f'/teacher/students/{student.id}/'
+        )
+
+    @staticmethod
+    def notify_absence_pattern(teacher, student, consecutive_misses):
+        if consecutive_misses >= 3:
+            NotificationService.create_notification(
+                user=teacher,
+                notification_type='absence_pattern',
+                title='Repeated Absences Detected',
+                message=f'{student.full_name} has missed {consecutive_misses} consecutive sessions.',
+                link=f'/teacher/students/{student.id}/attendance/'
+            )
 
 
 class EmailService:

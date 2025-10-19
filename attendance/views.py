@@ -42,40 +42,67 @@ class RegisterView(View):
         return render(request, self.template_name)
 
     def post(self, request):
-        ugr = request.POST.get('ugr')
+    # 1. Normalize and Retrieve Data
+        ugr_raw = request.POST.get('ugr')
+        ugr = ugr_raw.upper() if ugr_raw else ''
         password = request.POST.get('password')
         confirm_password = request.POST.get('confirm_password')
+        
+        context = {'ugr': ugr_raw} # Use the raw value for re-populating the form on error
 
-        # Validate UGR format
+        # 2. Validate UGR format (using the UPPERCASE value for matching)
         if not re.match(r'^UGR/\d{4}/\d{2}$', ugr):
             messages.error(request, "Invalid UGR format. Example: UGR/8286/17")
-            return render(request, self.template_name, {'ugr': ugr})
+            return render(request, self.template_name, context)
 
-        # Check password match
+        # 3. Check password match
         if password != confirm_password:
             messages.error(request, "Passwords do not match")
-            return render(request, self.template_name, {'ugr': ugr})
+            return render(request, self.template_name, context)
 
-        # Optional: validate teacher exists
-        # if teacher_id and not User.objects.filter(teacher_profile__employee_id=teacher_id, role='teacher').exists():
-        #     messages.error(request, "Teacher ID not found")
-        #     return render(request, self.template_name, {'ugr': ugr, 'teacher_id': teacher_id})
+        # 4. CRITICAL UNIQUENESS CHECK for student_id 🛑
+        # Check if a StudentProfile with this UGR already exists.
+        if StudentProfile.objects.filter(student_id=ugr).exists():
+            messages.error(request, f"A student profile with ID {ugr} already exists.")
+            return render(request, self.template_name, context)
 
-        # Check if user already exists
-        email = f"{ugr}@gmail.com"
-        user, created = User.objects.get_or_create(email=email, defaults={'role': 'student'})
+        # 5. Check if User already exists (via email, which is derived from UGR)
+        email = f"{ugr.lower()}@gmail.com"
+        
+        try:
+            # Check if a user with this email already exists
+            user, user_created = User.objects.get_or_create(email=email, defaults={'role': 'student', 'username': ugr})
+            
+            # If the user was newly created, set the password and save.
+            if user_created:
+                user.set_password(password)
+                user.save()
+                messages.success(request, "Account created successfully. You can now login.")
+            
+            # If the user already existed:
+            else:
+                # We already checked the student_id is unique, so this must be a re-submission 
+                # for an existing user who just needs their profile checked/created.
+                messages.info(request, "Account already exists. You can log in.")
 
-        if created:
-            user.set_password(password)
-            user.save()
-            messages.success(request, "Account created successfully. You can now login.")
-        else:
-            messages.info(request, "Account already exists. You can login.")
+            # 6. Ensure StudentProfile exists (Now this will only run if the student_id is unique)
+            # Note: If the user was *not* created (i.e., they existed), we still create the profile 
+            # as long as the student_id is unique.
+            student_profile, profile_created = StudentProfile.objects.get_or_create(
+                user=user, 
+                defaults={'student_id': ugr}
+            )
+            
+            # If the user already existed but the profile didn't (profile_created is True), 
+            # the profile is now created.
+            
+            return redirect('login') # Replace 'login' with your actual login URL name
 
-        # Ensure StudentProfile exists
-        StudentProfile.objects.get_or_create(user=user, defaults={'student_id': ugr})
-
-        return redirect('login')
+        except Exception as e:
+            # Catch any unexpected database or user creation errors
+            messages.error(request, f"An unexpected error occurred: {e}")
+            return render(request, self.template_name, context)
+            return redirect('login')
 
 
 # -----------------------
@@ -219,30 +246,47 @@ class AnalyticsView(LoginRequiredMixin, TeacherRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        courses = Course.objects.filter(teacher=self.request.user)
-        course_id = self.request.GET.get('course')
+        user = self.request.user
+        courses = Course.objects.filter(teacher=user)
         context['courses'] = courses
 
+        course_id = self.request.GET.get('course')
         if course_id:
-            selected_course = get_object_or_404(Course, id=course_id, teacher=self.request.user)
+            selected_course = get_object_or_404(Course, id=course_id, teacher=user)
             sessions = AttendanceSession.objects.filter(course=selected_course, status='ended')
-            data = []
-            for s in sessions:
-                present = AttendanceEntry.objects.filter(session=s, is_valid=True).count()
-                total = selected_course.students.count()
-                data.append({
-                    'date': s.start_time.strftime('%Y-%m-%d'),
-                    'present': present,
-                    'total': total,
-                    'percentage': (present / total * 100) if total > 0 else 0
+            
+            attendance_data = []
+            for session in sessions:
+                total_students = selected_course.students.count()
+                present_count = AttendanceEntry.objects.filter(session=session, is_valid=True).count()
+                percentage = min((present_count / total_students * 100) if total_students > 0 else 0, 100)
+                
+                attendance_data.append({
+                    'date': session.start_time.strftime('%Y-%m-%d'),
+                    'present': present_count,
+                    'total': total_students,
+                    'percentage': percentage
                 })
-            context['selected_course'] = selected_course
-            context['attendance_data'] = data
-        else:
-            context['selected_course'] = None
-            context['attendance_data'] = []
-        return context
 
+            # Calculate average attendance across all sessions
+            if attendance_data:
+                average_attendance = sum(d['percentage'] for d in attendance_data) / len(attendance_data)
+            else:
+                average_attendance = 0
+
+            context.update({
+                'selected_course': selected_course,
+                'attendance_data': attendance_data,
+                'average_attendance': average_attendance
+            })
+        else:
+            context.update({
+                'selected_course': None,
+                'attendance_data': [],
+                'average_attendance': 0
+            })
+
+        return context
 
 class ExportAttendanceView(LoginRequiredMixin, TeacherRequiredMixin, View):
     def get(self, request, session_id):
@@ -649,6 +693,7 @@ class StudentProfileEditView(LoginRequiredMixin, StudentRequiredMixin, UpdateVie
         if profile_form.is_valid():
             self.object = form.save()
             profile_form.save()
+            messages.success(self.request, "Profile updated successfully.")
             return redirect(self.get_success_url())
         else:
             # If the profile form is invalid, re-render the page with errors

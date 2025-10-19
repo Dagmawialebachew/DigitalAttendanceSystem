@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-
+{% load static %}
 {% block title %}Student Dashboard{% endblock %}
 
 {% block content %}
@@ -35,18 +35,32 @@
 {% endif %}
 
 
-    {# --- Header & Profile Alert --- #}
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-slate-200 dark:border-slate-700">
+   {# --- Header with Logo & Profile Alert --- #}
+<div class="flex flex-col items-center md:items-start mb-8 pb-4 border-b border-slate-200 dark:border-slate-700">
+
+  
+    <!-- Header & Button -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center w-full">
         <div class="mb-4 md:mb-0">
             <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-1">
-                Welcome back, {{ user.first_name|default:'Student' }}! 👋
+                {% if user.last_login == None %}
+                    Welcome, {{ user.first_name|default:'Student' }}! 🎉
+                {% else %}
+                    Welcome back, <br>{{ user.first_name|default:'Student' }}! 🎉
+                {% endif %}
             </h1>
-            <p class="text-lg text-slate-600 dark:text-slate-400">Your current attendance and progress overview.</p>
+            <p class="text-lg text-slate-600 dark:text-slate-400">
+                Your current attendance and progress overview.
+            </p>
         </div>
-        <a href="{% url 'attendance_history' %}" class="bg-primary-500 hover:bg-primary-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center w-full md:w-auto">
+
+        <a href="{% url 'attendance_history' %}"
+           class="bg-primary-500 hover:bg-primary-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center w-full md:w-auto">
             <i class="fas fa-calendar-check mr-2"></i> View Full History
         </a>
     </div>
+</div>
+
 
     {% if not profile_filled %}
     <div class="glass rounded-2xl p-4 mb-8 flex items-center flex-wrap gap-4 justify-between border border-red-400 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 shadow-md">
@@ -85,7 +99,7 @@
                         <div class="text-sm text-white mt-2 font-semibold countdown">Calculating...</div>
                     </div>
                     <div class="text-right flex-shrink-0">
-                        <div class="text-3xl font-black font-mono tracking-widest bg-white/20 px-3 py-1 rounded-lg">{{ session.code }}</div>
+                        <div class="text-3xl font-black font-mono tracking-widest bg-white/20 px-3 py-1 rounded-lg">****</div>
                         <div class="text-sm text-primary-100 mt-1 font-semibold">TAP TO SUBMIT</div>
                     </div>
                 </div>

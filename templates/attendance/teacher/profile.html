@@ -10,9 +10,15 @@
         <div class="flex flex-col md:flex-row items-center md:space-x-6">
             
             {# Profile Avatar/Initials #}
-            <div class="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg flex-shrink-0 mb-4 md:mb-0">
-                {{ user.first_name.0 }}{{ user.last_name.0 }}
-            </div>
+            <div class="flex items-center space-x-4 mb-4">
+                    {% if user.avatar %}
+                        <img src="{{ user.avatar.url }}" alt="Avatar" class="w-16 h-16 rounded-full object-cover border-2 border-primary-500">
+                    {% else %}
+                        <div class="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
+                            {{ user.first_name.0 }}{{ user.last_name.0 }}
+                        </div>
+                    {% endif %}
+                </div>
             
             {# Name and Role Details #}
             <div class="flex-1 text-center md:text-left">
@@ -36,11 +42,25 @@
                 </div>
             </div>
 
-            {# Edit Profile Button #}
-            <a href="{% url 'profile_edit' %}"
-               class="mt-4 md:mt-0 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-xl font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors duration-200 flex-shrink-0">
-                <i class="fas fa-edit mr-2"></i> Edit Profile
-            </a>
+           <div class="flex flex-col sm:flex-row md:flex-col lg:flex-row gap-3 mt-4 md:mt-0 flex-shrink-0">
+
+    <!-- Edit Profile Button -->
+    <a href="{% url 'profile_edit' %}"
+       class="flex items-center justify-center px-4 py-2 rounded-xl font-semibold 
+              bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100 
+              hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors duration-200">
+        <i class="fas fa-edit mr-2"></i> Edit Profile
+    </a>
+
+    <!-- Logout Button -->
+    <a href="{% url 'logout' %}"
+       class="flex items-center justify-center px-4 py-2 rounded-xl font-semibold 
+              bg-red-500 text-white hover:bg-red-600 transition-colors duration-200">
+        <i class="fas fa-sign-out-alt mr-2"></i> Logout
+    </a>
+
+</div>
+
         </div>
     </div>
 
@@ -110,10 +130,7 @@
                        class="block bg-slate-700 hover:bg-slate-800 text-white px-4 py-3 rounded-xl font-semibold transition-colors duration-200 text-center">
                         <i class="fas fa-chart-line mr-2"></i> View Analytics
                     </a>
-                    <a href="{% url 'logout' %}"
-                       class="block bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-semibold transition-colors duration-200 text-center">
-                        <i class="fas fa-sign-out-alt mr-2"></i> Logout
-                    </a>
+                    
                 </div>
             </div>
 

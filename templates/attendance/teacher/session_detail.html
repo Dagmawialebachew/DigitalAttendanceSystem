@@ -280,6 +280,8 @@ function updateCountdown() {
 // WebSocket
 // ===========================
 let ws;
+let sessionEnded = false;  // Flag to prevent multiple reloads
+
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/attendance/${sessionId}/`;
@@ -292,8 +294,12 @@ function connectWebSocket() {
     ws.onmessage = (e) => {
         console.log("Raw WebSocket message received:", e.data);
         let data;
-        try { data = JSON.parse(e.data); } 
-        catch(err) { console.error("Failed to parse WebSocket data:", err, e.data); return; }
+        try { 
+            data = JSON.parse(e.data); 
+        } catch(err) { 
+            console.error("Failed to parse WebSocket data:", err, e.data); 
+            return; 
+        }
 
         console.log("Parsed WebSocket data:", data);
 
@@ -309,8 +315,11 @@ function connectWebSocket() {
                 break;
 
             case 'session_ended':
-                console.log("Session ended, reloading page...");
-                location.reload();
+                if (!sessionEnded) {     // Only reload once
+                    sessionEnded = true;
+                    console.log("Session ended, reloading page...");
+                    location.reload();
+                }
                 break;
 
             case 'active_sessions':
@@ -329,8 +338,11 @@ function connectWebSocket() {
     ws.onerror = (err) => console.error("WebSocket error:", err);
 
     ws.onclose = (e) => {
-        console.warn("WebSocket closed. Reconnecting in 3s...", e);
-        setTimeout(connectWebSocket, 3000);
+        console.warn("WebSocket closed.", e);
+        if (!sessionEnded) {    // Only reconnect if session hasn't ended
+            console.log("Reconnecting in 3s...");
+            setTimeout(connectWebSocket, 3000);
+        }
     };
 }
 
