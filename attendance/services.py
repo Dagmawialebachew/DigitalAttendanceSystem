@@ -144,7 +144,7 @@ class AttendanceService:
             for s in recent_sessions:
                 students = s.course.students.all()
                 total_students = students.count()
-                marked = s.entries.filter(status='PRESENT').count()
+                marked = s.entries.filter(is_valid=True).count()
                 if total_students > 0:
                     total_rate += (marked / total_students * 100)
                     count += 1

@@ -271,8 +271,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     ws.onclose = () => {
         console.warn("🔴 WebSocket closed. Reconnecting in 5s...");
-        setTimeout(() => location.reload(), 5000);
-    };
+ setTimeout(() => {
+        connectWebSocket(); // your function to establish WebSocket again
+    }, 5000);    };
 
     // 🔹 Dynamic Countdown & Auto-Remove
     const sessionCards = document.querySelectorAll('.active-session-card');

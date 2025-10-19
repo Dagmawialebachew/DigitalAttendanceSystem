@@ -87,6 +87,7 @@ class RegisterView(View):
             )
 
             # Redirect to home page instead of login
+            login(request, user)
             return redirect('dashboard')  # <-- Change this to your actual home page URL name
 
         except Exception as e:
