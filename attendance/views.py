@@ -42,15 +42,15 @@ class RegisterView(View):
         return render(request, self.template_name)
 
     def post(self, request):
-    # 1. Normalize and Retrieve Data
+        # 1. Normalize and Retrieve Data
         ugr_raw = request.POST.get('ugr')
         ugr = ugr_raw.upper() if ugr_raw else ''
         password = request.POST.get('password')
         confirm_password = request.POST.get('confirm_password')
         
-        context = {'ugr': ugr_raw} # Use the raw value for re-populating the form on error
+        context = {'ugr': ugr_raw}  # Use the raw value for re-populating the form on error
 
-        # 2. Validate UGR format (using the UPPERCASE value for matching)
+        # 2. Validate UGR format
         if not re.match(r'^UGR/\d{4}/\d{2}$', ugr):
             messages.error(request, "Invalid UGR format. Example: UGR/8286/17")
             return render(request, self.template_name, context)
@@ -60,50 +60,38 @@ class RegisterView(View):
             messages.error(request, "Passwords do not match")
             return render(request, self.template_name, context)
 
-        # 4. CRITICAL UNIQUENESS CHECK for student_id 🛑
-        # Check if a StudentProfile with this UGR already exists.
+        # 4. Check for existing StudentProfile
         if StudentProfile.objects.filter(student_id=ugr).exists():
             messages.error(request, f"A student profile with ID {ugr} already exists.")
             return render(request, self.template_name, context)
 
-        # 5. Check if User already exists (via email, which is derived from UGR)
+        # 5. Check if User exists
         email = f"{ugr.lower()}@gmail.com"
-        
         try:
-            # Check if a user with this email already exists
-            user, user_created = User.objects.get_or_create(email=email, defaults={'role': 'student', 'username': ugr})
+            user, user_created = User.objects.get_or_create(
+                email=email,
+                defaults={'role': 'student', 'email': email}
+            )
             
-            # If the user was newly created, set the password and save.
             if user_created:
                 user.set_password(password)
                 user.save()
-                messages.success(request, "Account created successfully. You can now login.")
-            
-            # If the user already existed:
+                messages.success(request, "Account created successfully. Welcome!")
             else:
-                # We already checked the student_id is unique, so this must be a re-submission 
-                # for an existing user who just needs their profile checked/created.
-                messages.info(request, "Account already exists. You can log in.")
+                messages.info(request, "Account already exists. You can continue.")
 
-            # 6. Ensure StudentProfile exists (Now this will only run if the student_id is unique)
-            # Note: If the user was *not* created (i.e., they existed), we still create the profile 
-            # as long as the student_id is unique.
+            # 6. Ensure StudentProfile exists
             student_profile, profile_created = StudentProfile.objects.get_or_create(
                 user=user, 
                 defaults={'student_id': ugr}
             )
-            
-            # If the user already existed but the profile didn't (profile_created is True), 
-            # the profile is now created.
-            
-            return redirect('login') # Replace 'login' with your actual login URL name
+
+            # Redirect to home page instead of login
+            return redirect('dashboard')  # <-- Change this to your actual home page URL name
 
         except Exception as e:
-            # Catch any unexpected database or user creation errors
             messages.error(request, f"An unexpected error occurred: {e}")
             return render(request, self.template_name, context)
-            return redirect('login')
-
 
 # -----------------------
 # LOGIN VIEW
