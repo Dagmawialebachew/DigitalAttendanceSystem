@@ -1,7 +1,7 @@
 const CACHE_NAME = 'iAttend-v1';
 const urlsToCache = [
-  '/static/css/app.css',
-  '/static/icons/icon-192x192.png',
+  'static/css/app.css',
+  'static/icons/icon-192x192.png',
 ];
 
 self.addEventListener('install', event => {

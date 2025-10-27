@@ -232,95 +232,134 @@
 </div>
 {% endblock %}
 {% block extra_js %}
-
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const messages = document.querySelectorAll('.js-flash-message');
-    messages.forEach((msg, index) => {
-      const delay = 3000 + index * 1000; // staggered: 3s, 4s, 5s...
-      setTimeout(() => {
-        msg.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-        msg.style.opacity = '0';
-        msg.style.transform = 'translateY(-10px)';
-        setTimeout(() => msg.remove(), 500); // remove after fade
-      }, delay);
-    });
-  });
-</script>
-
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("✅ Script loaded and DOM ready at", new Date().toLocaleTimeString());
+  console.log("✅ Script loaded at", new Date().toLocaleTimeString());
 
-    // 🔹 Auto-Dismiss Flash Messages
-    
-    // 🔹 WebSocket for real-time updates
+  // 🔹 Auto-dismiss flash messages
+  const messages = document.querySelectorAll('.js-flash-message');
+  messages.forEach((msg, index) => {
+    const delay = 3000 + index * 1000;
+    setTimeout(() => {
+      msg.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+      msg.style.opacity = '0';
+      msg.style.transform = 'translateY(-10px)';
+      setTimeout(() => msg.remove(), 500);
+    }, delay);
+  });
+
+  // ===========================
+  // 🔹 WebSocket for notifications (with safe reconnect)
+  // ===========================
+  let ws;
+
+  function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/notifications/`;
     console.log("🌐 Connecting WebSocket to:", wsUrl);
-    const ws = new WebSocket(wsUrl);
+
+    ws = new WebSocket(wsUrl);
 
     ws.onopen = () => console.log("🟢 WebSocket connected at", new Date().toLocaleTimeString());
+
     ws.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        console.log("📩 WebSocket message received:", data);
-        if (data.type === 'notification' && data.data.type === 'session_started') {
-            console.log("🟢 New session started — reloading page...");
-            location.reload();
-        }
+      let data;
+      try {
+        data = JSON.parse(e.data);
+      } catch (err) {
+        console.error("📦 JSON parse error:", err, e.data);
+        return;
+      }
+
+      console.log("📩 WebSocket message received:", data);
+
+      if (data.type === 'notification' && data.data?.type === 'session_started') {
+        console.log("🟢 New session started — reloading page...");
+        location.reload();
+      }
     };
+
+    ws.onerror = (err) => console.warn("🔴 WebSocket error:", err);
+
     ws.onclose = () => {
-        console.warn("🔴 WebSocket closed. Reconnecting in 5s...");
- setTimeout(() => {
-        connectWebSocket(); // your function to establish WebSocket again
-    }, 5000);    };
+      console.warn("🔴 WebSocket closed. Reconnecting in 5s...");
+      // Reconnect only if tab visible to avoid thrashing
+      setTimeout(() => {
+        if (document.visibilityState === 'visible') connectWebSocket();
+      }, 5000);
+    };
+  }
 
-    // 🔹 Dynamic Countdown & Auto-Remove
-    const sessionCards = document.querySelectorAll('.active-session-card');
+  connectWebSocket();
 
-    sessionCards.forEach(card => {
-        const sessionId = card.dataset.sessionId;
-        const startTime = new Date(card.dataset.startTime).getTime();
-        const duration = parseInt(card.dataset.duration, 10) * 1000; // ms
-        const countdownEl = card.querySelector('.countdown');
-
-        if (isNaN(startTime) || isNaN(duration)) return;
-
-        const updateTimer = () => {
-            const now = Date.now();
-            const elapsed = now - startTime;
-            const remaining = duration - elapsed;
-
-            if (remaining <= 0) {
-                console.log(`❌ Session ID ${sessionId} expired. Removing card.`);
-                card.remove();
-                document.getElementById('activated-card').classList.add('text-center')
-                document.getElementById('activated-card').innerHTML = `  
-        <i class="far fa-clock text-6xl text-slate-400 dark:text-slate-600 mb-4"></i>
-        <h2 class="text-xl font-bold text-slate-900 dark:text-white">No Active Sessions</h2>
-        <p class="text-slate-600 dark:text-slate-400">Check back when your classes begin, or refresh this page.</p>
-    </div>`;
-                clearInterval(timer);
-                checkNoActiveSessions();
-            } else if (countdownEl) {
-                const mins = Math.floor(remaining / 60000);
-                const secs = Math.floor((remaining % 60000) / 1000);
-                countdownEl.textContent = `${mins}:${secs.toString().padStart(2, '0')} remaining`;
-            }
-        };
-
-        updateTimer();
-        const timer = setInterval(updateTimer, 1000);
-    });
-
-    // 🔹 Check if there are no active sessions
-    function checkNoActiveSessions() {
-        const remainingCards = document.querySelectorAll('.active-session-card');
-        if (remainingCards.length === 0) {
-            const noSessionsEl = document.querySelector('#no-active-sessions');
-            if (noSessionsEl) noSessionsEl.style.display = 'block';
-        }
+  // Pause/resume reconnect attempts based on tab visibility
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      if (!ws || ws.readyState === WebSocket.CLOSED) {
+        console.log("👀 Tab visible — attempting reconnect...");
+        connectWebSocket();
+      }
     }
+  });
+
+  // ===========================
+  // 🔹 Dynamic Countdown & Auto-Remove
+  // ===========================
+  const sessionCards = document.querySelectorAll('.active-session-card');
+
+  sessionCards.forEach(card => {
+    const sessionId = card.dataset.sessionId;
+    const startTimeStr = card.dataset.startTime;      // ISO or parseable
+    const durationSecStr = card.dataset.duration;     // seconds expected
+    const countdownEl = card.querySelector('.countdown');
+
+    const startTime = Date.parse(startTimeStr);       // ms since epoch
+    const durationMs = Number(durationSecStr) * 1000; // convert to ms
+
+    if (Number.isNaN(startTime) || !Number.isFinite(durationMs)) {
+      console.warn("⏸️ Invalid timer data for card", { sessionId, startTimeStr, durationSecStr });
+      return;
+    }
+
+    function updateTimer() {
+      const now = Date.now();
+      const elapsed = now - startTime;
+      const remaining = durationMs - elapsed;
+
+      if (remaining <= 0) {
+        console.log(`❌ Session ID ${sessionId} expired. Removing card.`);
+        card.remove();
+
+        const activated = document.getElementById('activated-card');
+        if (activated) {
+          activated.classList.add('text-center');
+          activated.innerHTML = `
+            <i class="far fa-clock text-6xl text-slate-400 dark:text-slate-600 mb-4"></i>
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white">No Active Sessions</h2>
+            <p class="text-slate-600 dark:text-slate-400">Check back when your classes begin, or refresh this page.</p>
+          `;
+        }
+
+        clearInterval(timer);
+        checkNoActiveSessions();
+      } else if (countdownEl) {
+        const mins = Math.floor(remaining / 60000);
+        const secs = Math.floor((remaining % 60000) / 1000);
+        countdownEl.textContent = `${mins}:${secs.toString().padStart(2, '0')} remaining`;
+      }
+    }
+
+    updateTimer();
+    const timer = setInterval(updateTimer, 1000);
+  });
+
+  function checkNoActiveSessions() {
+    const remainingCards = document.querySelectorAll('.active-session-card');
+    if (remainingCards.length === 0) {
+      const noSessionsEl = document.querySelector('#no-active-sessions');
+      if (noSessionsEl) noSessionsEl.style.display = 'block';
+    }
+  }
 });
 </script>
 {% endblock %}

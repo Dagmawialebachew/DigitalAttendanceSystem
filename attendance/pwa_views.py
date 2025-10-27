@@ -32,39 +32,26 @@ def manifest(request):
 
 def service_worker(request):
     sw_content = """
-const CACHE_NAME = 'attendance-v1';
+
+const CACHE_NAME = 'iAttend-v1';
 const urlsToCache = [
-    '/',
-    '/static/icons/icon-192x192.png',
-    '/static/icons/icon-512x512.png',
+  'static/css/app.css',
+  'static/icons/icon-192x192.png',
 ];
 
-self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => cache.addAll(urlsToCache))
-    );
-});
-
-self.addEventListener('fetch', (event) => {
-    event.respondWith(
-        caches.match(event.request)
-            .then((response) => response || fetch(event.request))
-    );
-});
-
-self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames.map((cacheName) => {
-                    if (cacheName !== CACHE_NAME) {
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        })
-    );
+self.addEventListener('install', event => {
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      return Promise.all(
+        urlsToCache.map(url =>
+          cache.add(url).catch(err => {
+            console.warn(`❌ Failed to cache ${url}`, err);
+          })
+        )
+      );
+    })
+  );
 });
 """
     return HttpResponse(sw_content, content_type='application/javascript')

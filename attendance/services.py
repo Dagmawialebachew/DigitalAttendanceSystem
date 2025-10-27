@@ -8,7 +8,7 @@ from .models import (
     AttendanceSession, AttendanceEntry, InvalidAttempt,
     GamificationPoints, Badge, StudentBadge, Notification
 )
-
+from django.db import IntegrityError, transaction 
 
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -17,21 +17,26 @@ from .models import AttendanceEntry
 
 class AttendanceService:
 
+        
     @staticmethod
-    def create_session(course, teacher, duration_seconds=10):
-        code = AttendanceSession.generate_code()
-        while AttendanceSession.objects.filter(code=code, status='active').exists():
+    def create_session(course, teacher, duration_seconds=10, max_retries=5):
+        for attempt in range(max_retries):
             code = AttendanceSession.generate_code()
-
-        session = AttendanceSession.objects.create(
-            course=course,
-            teacher=teacher,
-            code=code,
-            duration_seconds=duration_seconds
-        )
-
-        NotificationService.notify_session_started(session)
-        return session
+            try:
+                with transaction.atomic():
+                    session = AttendanceSession.objects.create(
+                        course=course,
+                        teacher=teacher,
+                        code=code,
+                        duration_seconds=duration_seconds
+                    )
+                NotificationService.notify_session_started(session)
+                return session
+            except IntegrityError:
+                # Collision happened, try again
+                if attempt == max_retries - 1:
+                    raise
+                continue
 
     @staticmethod
     def submit_attendance(session, student, code, ip_address, device_info):
