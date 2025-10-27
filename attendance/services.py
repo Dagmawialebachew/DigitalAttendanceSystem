@@ -210,16 +210,19 @@ class GamificationService:
                 TeacherNotificationService.notify_student_milestone(student.course.teacher, student, badge)
 
 
-
 class NotificationService:
     @staticmethod
-    def create_notification(user, notification_type, title, message, link=''):
+    def create_notification(user, notification_type, title, message, link='', 
+                            course=None, session_date=None): # 🚨 NEW ARGUMENTS
+        
         notification = Notification.objects.create(
             user=user,
             notification_type=notification_type,
             title=title,
             message=message,
-            link=link
+            link=link,
+            relevant_course=course,            # 🚨 NEW FIELD ASSIGNMENT
+            relevant_date=session_date         # 🚨 NEW FIELD ASSIGNMENT
         )
 
         channel_layer = get_channel_layer()
@@ -232,12 +235,14 @@ class NotificationService:
                     'type': notification_type,
                     'title': title,
                     'message': message,
-                    'link': link,
+                    # We don't send course/date over WebSocket yet, as the frontend uses AJAX to fetch the list anyway
+                    'link': link, 
                     'created_at': notification.created_at.isoformat()
                 }
             }
         )
 
+    # Student-side notifications (mostly unchanged, no need for complex course/date tracking yet)
     @staticmethod
     def notify_session_started(session):
         for student in session.course.students.all():
@@ -251,6 +256,7 @@ class NotificationService:
 
     @staticmethod
     def notify_attendance_marked(student, session):
+        # We can optionally add course/date here too, but for student link is enough
         NotificationService.create_notification(
             user=student,
             notification_type='attendance_marked',
@@ -268,8 +274,7 @@ class NotificationService:
             message=f'Congratulations! You earned the {badge.name} badge!',
             link='/student/gamification/'
         )
-
-
+        
 class TeacherNotificationService(NotificationService):
 
     @staticmethod
@@ -280,13 +285,18 @@ class TeacherNotificationService(NotificationService):
         absent = total_students - marked
 
         attendance_rate = (marked / total_students * 100) if total_students > 0 else 0
+        
+        # Get the session date from the start_time field
+        session_date = session.start_time.date() 
 
         NotificationService.create_notification(
             user=teacher,
             notification_type='session_summary',
             title=f'Attendance Summary: {session.course.name}',
             message=f'{marked} present, {absent} absent ({attendance_rate:.1f}% attendance) for today’s session.',
-            link=f'/teacher/session/{session.id}/summary/'
+            link=f'/teacher/session/{session.id}/summary/',
+            course=session.course,       # 🚨 ADDED
+            session_date=session_date    # 🚨 ADDED
         )
 
     @staticmethod
@@ -295,6 +305,7 @@ class TeacherNotificationService(NotificationService):
         total_students = students.count()
         marked = session.entries.filter(is_valid=True).count()
         today_rate = (marked / total_students * 100) if total_students > 0 else 0
+        session_date = session.start_time.date() # Get the session date
 
         # detect unusual dip (e.g. more than 15% lower than average)
         if today_rate < (avg_attendance_rate - 15):
@@ -304,11 +315,14 @@ class TeacherNotificationService(NotificationService):
                 title='Unusual Attendance Detected',
                 message=f"Today's attendance for {session.course.name} is {today_rate:.1f}%, "
                         f"below your usual {avg_attendance_rate:.1f}%.",
-                link=f'/teacher/session/{session.id}/'
+                link=f'/teacher/session/{session.id}/',
+                course=session.course,       # 🚨 ADDED
+                session_date=session_date    # 🚨 ADDED
             )
 
     @staticmethod
     def notify_student_milestone(teacher, student, milestone):
+        # We don't have a course/session context here, so we skip the new fields.
         NotificationService.create_notification(
             user=teacher,
             notification_type='student_milestone',
@@ -319,6 +333,7 @@ class TeacherNotificationService(NotificationService):
 
     @staticmethod
     def notify_absence_pattern(teacher, student, consecutive_misses):
+        # We don't have a specific course/session context here, so we skip the new fields.
         if consecutive_misses >= 3:
             NotificationService.create_notification(
                 user=teacher,
@@ -327,8 +342,6 @@ class TeacherNotificationService(NotificationService):
                 message=f'{student.full_name} has missed {consecutive_misses} consecutive sessions.',
                 link=f'/teacher/students/{student.id}/attendance/'
             )
-
-
 class EmailService:
     @staticmethod
     def send_attendance_recap(session):

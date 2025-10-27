@@ -127,16 +127,16 @@
     </div>
 
     {# --- Add Course Modal (Hidden initially) --- #}
-    <div id="add-course-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center hidden z-50">
+    <div id="add-course-modal" class="fixed inset-0 bg-black/40 flex flex-col items-center justify-center hidden z-50">
         <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <h2 class="text-xl font-bold mb-4 text-slate-900 dark:text-white">Add Course by Code</h2>
-            <form method="post" action="{% url 'add_course' %}" class="flex gap-2">
+            <form method="post" action="{% url 'add_course' %}" class="flex flex-col gap-2">
     {% csrf_token %}
     <input type="text" name="course_code" placeholder="Enter course code"
            class="flex-1 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
            required>
     <button type="submit"
-            class="bg-primary-500 hover:bg-primary-600 text-white font-semibold px-4 py-2 rounded-xl transition">
+            class="bg-primary-500 block hover:bg-primary-600 text-white font-semibold px-4 py-2 rounded-xl transition">
         Add Course
     </button>
 </form>

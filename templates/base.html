@@ -55,13 +55,21 @@
                     <span class="text-xs font-medium">Rewards</span>
                 </a>
                 {% else %}
-                <a href="{% url 'analytics' %}"
-                   class="nav-item flex flex-col items-center justify-center flex-1 py-2 transition-all duration-200 hover:text-primary-600 dark:hover:text-primary-400 {% if request.resolver_match.url_name == 'analytics' %}text-primary-600 dark:text-primary-400{% else %}text-slate-600 dark:text-slate-400{% endif %}">
-                    <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                    <span class="text-xs font-medium">Analytics</span>
-                </a>
+                <a href="{% url 'my_students' %}"
+   class="nav-item flex flex-col items-center justify-center flex-1 py-2 transition-all duration-200 hover:text-primary-600 dark:hover:text-primary-400 {% if request.resolver_match.url_name == 'my_students' %}text-primary-600 dark:text-primary-400{% else %}text-slate-600 dark:text-slate-400{% endif %}">
+    <i class="fa-solid fa-user-graduate text-xl mb-1"></i>
+    <span class="text-xs font-medium">Students</span>
+</a>
+
+<!-- Analytics -->
+<a href="{% url 'analytics' %}"
+   class="nav-item flex flex-col items-center justify-center flex-1 py-2 transition-all duration-200 hover:text-primary-600 dark:hover:text-primary-400 {% if request.resolver_match.url_name == 'analytics' %}text-primary-600 dark:text-primary-400{% else %}text-slate-600 dark:text-slate-400{% endif %}">
+    <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+    </svg>
+    <span class="text-xs font-medium">Analytics</span>
+</a>
                 {% endif %}
 
                 <a href="{% url 'notifications' %}"
@@ -181,7 +189,32 @@
             }, false);
         }
     </script>
-    
+<script>
+    // 1. Define the storage key
+    const scrollPositionKey = 'studentDetailScroll';
+
+    // 2. Save the scroll position just before the page unloads/reloads
+    window.addEventListener('beforeunload', () => {
+        // Save the current vertical scroll position (scrollY)
+        sessionStorage.setItem(scrollPositionKey, window.scrollY);
+    });
+
+    // 3. Restore the scroll position when the page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        const storedScrollY = sessionStorage.getItem(scrollPositionKey);
+
+        if (storedScrollY) {
+            // Scroll to the saved position, using 'auto' for instant scroll
+            window.scrollTo({
+                top: parseInt(storedScrollY, 10),
+                behavior: 'auto'
+            });
+            
+            // Clean up the key to ensure the next fresh visit starts at the top
+            sessionStorage.removeItem(scrollPositionKey);
+        }
+    });
+</script>
 
     {% block extra_js %}{% endblock %}
 </body>

@@ -1,4 +1,8 @@
+import datetime
+import json
 import re
+from django.utils.encoding import smart_str
+from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -12,13 +16,16 @@ from django.db.models import Q
 from datetime import timedelta
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-
+from django.db.models import Prefetch
+from django.http import HttpRequest
+from django.db.models import Prefetch, Count, Q
+from django.db.models.functions import TruncMonth
 import csv
 from .models import (
     User, Course, AttendanceSession, AttendanceEntry,
     GamificationPoints, Badge, StudentBadge, Notification
 )
-from .services import AttendanceService, GamificationService
+from .services import AttendanceService
 
 
 # --- Helper Mixins ---
@@ -230,74 +237,333 @@ class ManualOverrideView(LoginRequiredMixin, TeacherRequiredMixin, View):
         return redirect('session_detail', session_id=session.id)
 
 
-class AnalyticsView(LoginRequiredMixin, TeacherRequiredMixin, TemplateView):
+class AnalyticsView(LoginRequiredMixin, TeacherRequiredMixin, View):
+    """
+    Handles analytics with:
+    - Course tabs
+    - Date filter tabs (Today, Week, Month, All)
+    - Custom date picker
+    - "5 recent" fallback for 'Today'
+    """
     template_name = 'attendance/teacher/analytics.html'
+    partial_template_name = 'attendance/teacher/_analytics_data.html'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        user = self.request.user
-        courses = Course.objects.filter(teacher=user)
-        context['courses'] = courses
+    def get(self, request: HttpRequest) -> HttpResponse:
+        teacher = request.user
+        is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+        today = timezone.localdate()
+        
+        # 1. Get all courses for the tabs
+        courses_queryset = Course.objects.filter(teacher=teacher).order_by('name')
 
-        course_id = self.request.GET.get('course')
-        if course_id:
-            selected_course = get_object_or_404(Course, id=course_id, teacher=user)
-            sessions = AttendanceSession.objects.filter(course=selected_course, status='ended')
-            
-            attendance_data = []
-            for session in sessions:
-                total_students = selected_course.students.count()
-                present_count = AttendanceEntry.objects.filter(session=session, is_valid=True).count()
-                percentage = min((present_count / total_students * 100) if total_students > 0 else 0, 100)
-                
-                attendance_data.append({
-                    'date': session.start_time.strftime('%Y-%m-%d'),
-                    'present': present_count,
-                    'total': total_students,
-                    'percentage': percentage
-                })
+        # 2. Get filters. Default to '0' (All Courses) and 'today'.
+        course_id = request.GET.get('course', '0')
+        # This one parameter handles 'today', 'week', 'month', 'all', OR a date string
+        date_filter = request.GET.get('date_filter', 'today') 
 
-            # Calculate average attendance across all sessions
-            if attendance_data:
-                average_attendance = sum(d['percentage'] for d in attendance_data) / len(attendance_data)
-            else:
-                average_attendance = 0
+        # 3. Get the analytics data
+        context = self._get_analytics_data(
+            teacher, 
+            courses_queryset, 
+            course_id, 
+            date_filter
+        )
+        
+        # 4. Add data for the main page template
+        context['courses'] = courses_queryset
+        context['today_iso'] = today.isoformat() 
+        
+        # Pass the date_filter back for active tab styling
+        context['selected_date_filter'] = context.get('selected_date_filter', date_filter)
 
-            context.update({
-                'selected_course': selected_course,
-                'attendance_data': attendance_data,
-                'average_attendance': average_attendance
-            })
+        # 5. Render
+        if is_ajax:
+            return render(request, self.partial_template_name, context)
+        
+        return render(request, self.template_name, context)
+
+    def _get_analytics_data(self, teacher, courses_queryset, course_id, date_filter):
+        
+        selected_course = None
+        courses_to_analyze = None
+        is_master_view = (course_id == '0')
+
+        if is_master_view:
+            courses_to_analyze = courses_queryset
         else:
-            context.update({
-                'selected_course': None,
-                'attendance_data': [],
-                'average_attendance': 0
-            })
+            selected_course = get_object_or_404(courses_queryset, id=course_id)
+            courses_to_analyze = Course.objects.filter(pk=selected_course.pk)
+        
+        # --- 1. Student Counts (Unchanged) ---
+        student_counts_map = {
+            c['id']: c['student_count'] 
+            for c in courses_to_analyze.annotate(student_count=Count('students'))
+                                    .values('id', 'student_count')
+        }
 
-        return context
+        # --- 2. Smart Date Filtering ---
+        today = timezone.localdate()
+        date_filter_q = Q() # Default to 'all'
+        parsed_date_iso = None # For display
+        is_today_query = False
+
+        if date_filter == 'today':
+            date_filter_q = Q(start_time__date=today)
+            parsed_date_iso = today.isoformat()
+            is_today_query = True
+        elif date_filter == 'week':
+            start_of_week = today - datetime.timedelta(days=today.weekday())
+            date_filter_q = Q(start_time__date__gte=start_of_week)
+            parsed_date_iso = f"Week of {start_of_week.isoformat()}"
+        elif date_filter == 'month':
+            start_of_month = today.replace(day=1)
+            date_filter_q = Q(start_time__date__gte=start_of_month)
+            parsed_date_iso = f"Month of {start_of_month.isoformat()}"
+        elif date_filter == 'all':
+            parsed_date_iso = "All Time"
+            pass # date_filter_q is already empty Q()
+        else:
+            # Try to parse it as a custom date string
+            try:
+                parsed_date = datetime.date.fromisoformat(date_filter)
+                date_filter_q = Q(start_time__date=parsed_date)
+                parsed_date_iso = parsed_date.isoformat()
+                if parsed_date == today:
+                    is_today_query = True
+            except (ValueError, TypeError):
+                # Fallback to 'today' if date is invalid
+                date_filter_q = Q(start_time__date=today)
+                parsed_date_iso = today.isoformat()
+                date_filter = 'today' # Correct the filter for the template
+                is_today_query = True
+                
+        # --- 3. Get Base Session Query (Unchanged) ---
+        sessions_base_qs = AttendanceSession.objects.filter(
+            course__in=courses_to_analyze, 
+            status='ended'
+        )
+
+        # 4. Run Primary Query
+        sessions = (
+            sessions_base_qs.filter(date_filter_q) # Apply the smart filter
+            .annotate(
+                present_count=Count('entries', filter=Q(entries__is_valid=True))
+            )
+            .select_related('course')
+            .order_by('-start_time')
+        )
+
+        # 5. Process Primary Data (Unchanged)
+        attendance_data = []
+        all_percentages = []
+        for session in sessions:
+            # ... (Same data processing logic) ...
+            total_students = student_counts_map.get(session.course.id, 0)
+            present_count = session.present_count
+            percentage = min((present_count / total_students * 100) if total_students > 0 else 0, 100)
+            all_percentages.append(percentage)
+            attendance_data.append({ 'date': session.start_time.strftime('%Y-%m-%d'), 'course_name': session.course.code, 'present': present_count, 'total': total_students, 'percentage': percentage,     'course_id': session.course.id })
+
+        # 6. Calculate Primary Stats (Unchanged)
+        average_attendance = sum(all_percentages) / len(all_percentages) if all_percentages else 0
+        total_sessions_count = len(attendance_data)
+        total_students_count = 0 # ... (Same student count logic) ...
+        if is_master_view:
+            total_students_count = User.objects.filter(role='student', courses_enrolled__in=courses_to_analyze).distinct().count()
+        elif selected_course:
+            total_students_count = student_counts_map.get(selected_course.id, 0)
+
+        # 7. FALLBACK LOGIC (Only for 'today' queries)
+        is_fallback_view = False
+        if not attendance_data and is_today_query:
+            is_fallback_view = True
+            sessions_fallback = (
+                sessions_base_qs
+                .annotate(present_count=Count('entries', filter=Q(entries__is_valid=True)))
+                .select_related('course')
+                .order_by('-start_time')
+            )[:5] # Get 5 most recent
+            
+            # Re-process data *just for the list*
+            attendance_data = []
+            for session in sessions_fallback:
+                # ... (Same processing logic as in step 5) ...
+                total_students = student_counts_map.get(session.course.id, 0)
+                present_count = session.present_count
+                percentage = min((present_count / total_students * 100) if total_students > 0 else 0, 100)
+                attendance_data.append({ 'date': session.start_time.strftime('%Y-%m-%d'), 'course_name': session.course.code, 'present': present_count, 'total': total_students, 'percentage': percentage })
+
+        # 8. Chart Data
+        # Title says "Last 30", so let's slice it to 30
+        chart_data_list = attendance_data[:30]
+        chart_labels = [d['date'] for d in reversed(chart_data_list)]
+        chart_data_pct = [d['percentage'] for d in reversed(chart_data_list)]
+        print(chart_labels, chart_data_pct, "--- chart data ---", chart_data_list)
+
+        return {
+            'selected_course_id': course_id,
+            'selected_date_filter': date_filter, # This is key: 'today', 'week', or 'YYYY-MM-DD'
+            'display_date_range': parsed_date_iso, # For titles
+            'is_master_view': is_master_view,
+            'average_attendance': average_attendance,
+            'total_sessions': total_sessions_count,
+            'total_students': total_students_count,
+            'attendance_data': attendance_data,
+            'has_data': bool(attendance_data),
+            'is_fallback_view': is_fallback_view,
+            'chart_labels': json.dumps(chart_labels),
+            'chart_data_pct': json.dumps(chart_data_pct, cls=DjangoJSONEncoder),
+        }
+
+
+
 
 class ExportAttendanceView(LoginRequiredMixin, TeacherRequiredMixin, View):
     def get(self, request, session_id):
-        session = get_object_or_404(AttendanceSession, id=session_id, teacher=request.user)
-        entries = AttendanceEntry.objects.filter(session=session, is_valid=True).select_related('student')
+        session = get_object_or_404(
+            AttendanceSession, id=session_id, teacher=request.user
+        )
+        entries = AttendanceEntry.objects.filter(
+            session=session, is_valid=True
+        ).select_related('student')
 
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="attendance_{session.code}.csv"'
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = (
+            f'attachment; filename="attendance_{session.code}.csv"'
+        )
+
         writer = csv.writer(response)
-        writer.writerow(['Student Name', 'Email', 'Student ID', 'Timestamp', 'Manually Added'])
+        writer.writerow([
+            'Student Name',
+            'Email',
+            'Student ID',
+            'Date',
+            'Time',
+            'Manually Added'
+        ])
 
         for e in entries:
+            # Format date and time separately
+            date_str = e.timestamp.strftime('%a, %b %d, %Y')   # Mon, Oct 05, 2025
+            time_str = e.timestamp.strftime('%I:%M %p')        # 12:00 PM
+
             writer.writerow([
-                e.student.get_full_name(),
-                e.student.email,
-                getattr(e.student.student_profile, 'student_id', ''),
-                e.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                smart_str(e.student.get_full_name()),
+                smart_str(e.student.email),
+                smart_str(getattr(e.student.student_profile, 'student_id', '')),
+                date_str,
+                time_str,
                 'Yes' if e.manually_added else 'No'
             ])
+
         return response
+# In attendance/views.py
 
+import datetime
+from django.shortcuts import render, get_object_or_404
+from django.views.generic import View
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Count, Q, Max, F
+from django.http import JsonResponse
 
+# Assuming these are your necessary custom mixins and models
+# from .mixins import TeacherRequiredMixin 
+# from .models import Course, AttendanceSession, AttendanceEntry, User # <-- Ensure User is imported
+
+class DailySessionDetailView(LoginRequiredMixin, TeacherRequiredMixin, View):
+    """
+    Displays all students and their attendance status (aggregated) for a single day.
+    Also handles the AJAX request for the student roster.
+    """
+    template_name = 'attendance/teacher/daily_detail.html'
+    
+    def get(self, request, course_id, date_str):
+        try:
+            target_date = datetime.date.fromisoformat(date_str)
+        except ValueError:
+            return render(request, 'error_page.html', {'message': 'Invalid date format.'}, status=400)
+        
+        teacher = request.user
+        course = get_object_or_404(Course, pk=course_id, teacher=teacher)
+        
+        # 1. Get all sessions for the day/course
+        sessions = AttendanceSession.objects.filter(
+            course=course,
+            start_time__date=target_date,
+            status='ended'
+        ).order_by('start_time')
+        
+        # 2. Get all students in the course
+        all_students = course.students.all().order_by('last_name', 'first_name')
+        
+        # --- Roster Processing (needed for both initial load and AJAX) ---
+        roster = self._get_daily_roster(all_students, sessions)
+        roster_json = json.dumps(roster, cls=DjangoJSONEncoder)
+
+        # Handle AJAX request for the live data update
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'roster': roster_json})
+
+        # Initial GET request (Full page render)
+        context = {
+            'course': course,
+            'target_date': target_date,
+            'initial_roster_json': roster_json, # Pass processed data as JSON for initial page load
+            'has_sessions': sessions.exists(),
+        }
+        
+        return render(request, self.template_name, context)
+
+    def _get_daily_roster(self, all_students, sessions):
+        # Maps student ID to their status in the LAST session of the day
+        student_status_map = {} 
+        
+        # 1. If there are sessions, find the ID of the LATEST session
+        latest_session_id = sessions.aggregate(Max('id'))['id__max']
+        
+        if latest_session_id:
+            # 2. Find all entries for ALL sessions on this day
+            all_entries = AttendanceEntry.objects.filter(
+                session__in=sessions
+            ).select_related('student', 'session')
+            
+            # Use a dict to track the status, prioritizing the latest session
+            status_tracking = {} # { student_id: { status: 'P'/'A', session_time: datetime } }
+            
+            for entry in all_entries:
+                student_id = entry.student_id
+                entry_time = entry.session.start_time
+                status = 'P' if entry.is_valid else 'A'
+                
+                # Update status only if it's the first record or a LATER session
+                if student_id not in status_tracking or entry_time > status_tracking[student_id]['session_time']:
+                    status_tracking[student_id] = {
+                        'status': status,
+                        'session_time': entry_time
+                    }
+        
+            # 3. Compile the final roster using the tracking data
+            roster = []
+            for student in all_students:
+                final_status = status_tracking.get(student.id, {'status': 'A'})['status'] # Default to Absent if no entry
+                
+                roster.append({
+                    'id': student.id,
+                    'name': f"{student.first_name} {student.last_name}",
+                    'status': final_status, # 'P' or 'A'
+                })
+                
+        else:
+            # No sessions means everyone is Absent (by default)
+            roster = [{
+                'id': student.id, 
+                'name': f"{student.first_name} {student.last_name}", 
+                'status': 'A'
+            } for student in all_students]
+            
+        print(roster, "--- daily roster ---")
+
+        return roster
 # --- Student Views ---
 class StudentDashboardView(LoginRequiredMixin, StudentRequiredMixin, TemplateView):
     template_name = 'attendance/student/dashboard.html'
@@ -471,22 +737,42 @@ class ProfileView(LoginRequiredMixin, TemplateView):
             'notifications': notifications
         }
 
+# In attendance/views.py (NotificationsView)
+
+from django.db.models import Case, When, BooleanField # NEW IMPORT
+
 class NotificationsView(LoginRequiredMixin, TemplateView):
     template_name = 'attendance/notifications.html'
 
     def get_context_data(self, **kwargs):
-        return {'notifications': Notification.objects.filter(user=self.request.user)}
-
+        # 1. Order by unread first (False) then by creation date (descending)
+        notifications = Notification.objects.filter(user=self.request.user).order_by(
+            Case(
+                When(is_read=False, then=0),
+                default=1,
+                output_field=BooleanField(),
+            ),
+            '-created_at'
+        )
+        
+        return {'notifications': notifications}
+    
+    # We will DELETE the existing POST method since we will use a separate URL 
+    # for the automatic mark-as-read action, or modify it to be more generic.
+    # We'll stick to a simple endpoint for auto-read.
     def post(self, request):
+        # Keep this for the auto-read endpoint, but simplify the logic
         notif_id = request.POST.get('notification_id')
-        notif = get_object_or_404(Notification, id=notif_id, user=request.user)
-        notif.is_read = True
-        notif.save()
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'success': True})
-        return redirect('notifications')
-
-
+        if notif_id:
+            try:
+                notif = Notification.objects.get(id=notif_id, user=request.user, is_read=False)
+                notif.is_read = True
+                notif.save()
+                return JsonResponse({'success': True})
+            except Notification.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Notification already read or not found'}, status=404)
+        return JsonResponse({'success': False, 'message': 'Invalid ID'}, status=400)
+    
 class MarkNotificationReadView(LoginRequiredMixin, View):
     def post(self, request, notification_id):
         notif = get_object_or_404(Notification, id=notification_id, user=request.user)
@@ -717,3 +1003,349 @@ class AddCourseView(LoginRequiredMixin, StudentRequiredMixin, View):
             messages.error(request, "Invalid course code. Please check and try again.")
 
         return redirect('profile')
+    
+
+# attendance/views.py
+
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render, get_object_or_404
+from django.views import View
+from django.db.models import Prefetch, Count, Q
+from django.utils import timezone
+from datetime import timedelta
+
+# Assuming these models and mixins are imported from your project:
+# from .models import Course, User, attendance_entries 
+# from .mixins import LoginRequiredMixin, TeacherRequiredMixin 
+
+# attendance/views.py
+
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render, get_object_or_404
+from django.views import View
+from django.db.models import Prefetch, Count, Q
+from django.utils import timezone
+from datetime import timedelta
+# Assuming imports for LoginRequiredMixin, TeacherRequiredMixin, User, Course, etc.
+
+class MyStudentsView(LoginRequiredMixin, TeacherRequiredMixin, View):
+    """
+    Handles both the full-page load (Master Roster) and AJAX fetch 
+    (Course-specific Roster) for the teacher's students, including monthly stats.
+    """
+    template_name = 'attendance/teacher/my_students.html'
+    partial_template_name = 'attendance/teacher/_student_list_table.html'
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        teacher = request.user
+        course_id = request.GET.get('course_id') 
+
+        # 1. Fetch teacher's courses efficiently
+        courses_queryset = (
+            Course.objects.filter(teacher=teacher)
+            .annotate(student_count=Count('students'))
+            .order_by('code')
+        )
+
+        selected_course = None
+        students_data = [] 
+        
+        # --- Determine the scope of students and courses ---
+        if not course_id or course_id == '0':
+            # Master Roster: All students across all courses
+            courses_to_fetch = courses_queryset
+            
+            courses_with_students = (
+                courses_to_fetch
+                .prefetch_related(
+                    Prefetch(
+                        'students', 
+                        queryset=User.objects.filter(role='student')
+                                             .select_related('student_profile', 'gamification_points')
+                    )
+                )
+            )
+
+            student_set = {}
+            for course in courses_with_students:
+                for student in course.students.all():
+                    student_id = student.id
+                    
+                    if student_id not in student_set:
+                        student_set[student_id] = {
+                            'student': student,
+                            'courses': [course],
+                        }
+                    else:
+                        student_set[student_id]['courses'].append(course)
+
+            students_data = list(student_set.values())
+            # Sorting is done here for the master roster
+            students_data.sort(key=lambda x: x['student'].last_name or '') 
+            
+            # Use all courses for attendance filtering in the master view
+            attendance_courses = courses_queryset 
+
+        else:
+            # Course-Specific Roster: Students only in the selected course
+            try:
+                selected_course = get_object_or_404(courses_queryset, id=course_id)
+                course_students = (
+                    selected_course.students.filter(role='student')
+                    .select_related('student_profile', 'gamification_points')
+                    .order_by('last_name')
+                )
+                
+                students_data = [{
+                    'student': student, 
+                    'courses': [selected_course]
+                } for student in course_students]
+                
+                # Use only the selected course for attendance filtering
+                attendance_courses = Course.objects.filter(pk=selected_course.pk)
+                
+            except (ValueError, TypeError):
+                pass
+        
+        # --- ATTENDANCE STATS CALCULATION ---
+        today = timezone.localdate()
+        start_of_month = today.replace(day=1)
+        
+        # Get IDs of all students in the roster
+        student_ids = [data['student'].id for data in students_data]
+        
+        # Get course IDs as a list for correct filtering in Q() objects
+        attendance_course_ids = attendance_courses.values_list('id', flat=True)
+        
+        # Annotate the student QuerySet with monthly stats
+        # The lookup is corrected to: attendance_entries -> session -> course -> id
+        annotated_students_qs = User.objects.filter(id__in=student_ids).filter(role='student').annotate(
+            # Count Present statuses for the current month and relevant courses
+            month_presents=Count('attendance_entries', filter=
+                Q(attendance_entries__session__course__id__in=attendance_course_ids, # <-- CORRECTED PATH
+                  attendance_entries__timestamp__date__gte=start_of_month,            # <-- Filtering by date of timestamp
+                  attendance_entries__is_valid=True)                                # <-- Assuming "Present" means 'is_valid=True'
+            ),
+            # Count Absences (Invalid or Missing Entries)
+            # NOTE: True 'Absence' is usually lack of an AttendanceEntry. 
+            # This counts INVALID entries (not present).
+            month_invalid_entries=Count('attendance_entries', filter=
+                Q(attendance_entries__session__course__id__in=attendance_course_ids, # <-- CORRECTED PATH
+                  attendance_entries__timestamp__date__gte=start_of_month, 
+                  attendance_entries__is_valid=False)                               # <-- Assuming "Absent/Invalid" means 'is_valid=False'
+            ),
+            # Count the total number of relevant sessions attended
+            month_total_sessions=Count('attendance_entries', filter=
+                Q(attendance_entries__session__course__id__in=attendance_course_ids, # <-- CORRECTED PATH
+                  attendance_entries__timestamp__date__gte=start_of_month)
+            ) 
+        ).select_related('student_profile', 'gamification_points')
+        
+        # Map the annotated students back to the students_data structure
+        annotated_student_map = {s.id: s for s in annotated_students_qs}
+
+        for data in students_data:
+            student = annotated_student_map.get(data['student'].id)
+            if student:
+                data['student'] = student
+                
+                # CALCULATE ATTENDANCE RATE IN PYTHON
+                total = student.month_total_sessions
+                presents = student.month_presents
+                
+                if total > 0:
+                    rate = (presents / total) * 100
+                    data['student'].attendance_rate = f"{rate:.0f}"
+                else:
+                    data['student'].attendance_rate = 'N/A'
+                    
+                # Re-map the 'absences' field for consistency with the template
+                # Note: The 'month_absences' in the template context should correspond 
+                # to the calculated month_invalid_entries here.
+                data['student'].month_absences = student.month_invalid_entries
+
+
+        context = {
+            'courses': courses_queryset,
+            'selected_course': selected_course,
+            'students_data': students_data,
+            'is_master_roster': not selected_course,
+            'current_month': today.strftime('%B'),
+        }
+        
+        # --- Handle Request Type ---
+        is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+
+        if is_ajax:
+            return render(request, self.partial_template_name, context)
+        
+        return render(request, self.template_name, context)
+
+from django.shortcuts import get_object_or_404
+from django.views.generic import TemplateView
+from django.db.models import Count, Q
+from django.db.models.functions import TruncMonth 
+from django.utils import timezone
+# Ensure you import your models and mixins here
+# from .models import User, Course, AttendanceEntry 
+# from .mixins import LoginRequiredMixin, TeacherRequiredMixin, ...
+
+
+
+from django.views.generic import TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import get_object_or_404
+from django.db.models import Count, Q
+from django.db.models.functions import TruncMonth
+
+# Assuming these imports exist in your project setup
+# from .mixins import TeacherRequiredMixin 
+# from users.models import User
+# from attendance.models import AttendanceEntry 
+# from courses.models import Course 
+# NOTE: Replace 'User' and 'AttendanceEntry' with your actual imported models.
+
+class StudentDetailTeacherView(LoginRequiredMixin, TeacherRequiredMixin, TemplateView):
+    """
+    Displays the detailed profile and attendance analytics for a single student. 
+    Data includes overall stats, monthly attendance trends for charting, and 
+    a detailed session history, all filtered to courses the current teacher shares with the student.
+    """
+    template_name = 'attendance/teacher/student_detail.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        teacher = self.request.user
+        student_id = kwargs.get('student_id')
+
+        # 1. Fetch teacher's courses and define authorization scope
+        teacher_courses_qs = teacher.courses_taught.all()
+        
+        # 2. Authorize and fetch the student
+        # Assuming User is imported and has 'role', 'courses_enrolled' relations
+        student_queryset = (
+            User.objects.filter(role='student')
+            .filter(courses_enrolled__in=teacher_courses_qs)
+            .distinct() 
+            .select_related('student_profile', 'gamification_points')
+        )
+        student = get_object_or_404(student_queryset, id=student_id)
+        
+        # 3. Determine the set of courses shared between the student and teacher
+        shared_courses_qs = teacher_courses_qs.filter(students=student).order_by('code')
+        shared_course_ids = shared_courses_qs.values_list('id', flat=True)
+        
+        # 4. Context Course (for highlighting, if applicable)
+        context_course = None
+        course_id = kwargs.get('course_id')
+        if course_id:
+            # We fetch it again using shared_courses_qs to ensure teacher has access
+            context_course = get_object_or_404(shared_courses_qs, id=course_id)
+        
+        # ----------------------------------------------------------------------
+        # 5. OVERALL ATTENDANCE STATISTICS (Across all shared courses)
+        # ----------------------------------------------------------------------
+        # This part looks robust and doesn't need changes.
+        student_with_stats = User.objects.filter(pk=student.pk).annotate(
+            all_time_presents=Count('attendance_entries', filter=
+                Q(attendance_entries__session__course__id__in=shared_course_ids, 
+                  attendance_entries__is_valid=True)
+            ),
+            all_time_invalid=Count('attendance_entries', filter=
+                Q(attendance_entries__session__course__id__in=shared_course_ids, 
+                  attendance_entries__is_valid=False)
+            ),
+            all_time_total_entries=Count('attendance_entries', filter=
+                Q(attendance_entries__session__course__id__in=shared_course_ids)
+            )
+        ).first()
+
+        presents = student_with_stats.all_time_presents
+        total_entries = student_with_stats.all_time_total_entries
+        
+        attendance_rate = 0
+        if total_entries > 0:
+            attendance_rate = (presents / total_entries) * 100
+
+        attendance_stats = {
+            'rate': f"{attendance_rate:.0f}",
+            'presents': presents,
+            'invalid': student_with_stats.all_time_invalid,
+            'total': total_entries,
+        }
+        
+        # ----------------------------------------------------------------------
+        # 6. MONTHLY ATTENDANCE TRENDS (Chart Data)
+        # ----------------------------------------------------------------------
+        # This section is fine, as .values() and list() handle date serialization for json_script.
+        monthly_stats_qs = (
+            AttendanceEntry.objects.filter(
+                student=student,
+                session__course__id__in=shared_course_ids
+            )
+            .annotate(month=TruncMonth('session__start_time'))
+            .values('month')
+            .annotate(
+                presents=Count('pk', filter=Q(is_valid=True)),
+                invalid=Count('pk', filter=Q(is_valid=False)),
+                total=Count('pk')
+            )
+            .order_by('month') 
+        )
+        monthly_stats = list(monthly_stats_qs)
+
+        # CRITICAL FIX: Ensure 'month' datetime objects are converted to strings for JSON
+        for stat in monthly_stats:
+             if 'month' in stat and stat['month']:
+                 stat['month'] = stat['month'].isoformat()
+        
+        # ----------------------------------------------------------------------
+        # 7. DETAILED ATTENDANCE HISTORY (Grouped by Course) - NOW WITH SERIALIZATION
+        # ----------------------------------------------------------------------
+        attendance_history_qs = (
+            AttendanceEntry.objects.filter(
+                student=student,
+                session__course__id__in=shared_course_ids
+            )
+            .select_related('session__course', 'session')
+            .order_by('-session__start_time')
+        )
+        
+        # Group history by course name and manually serialize relevant fields for JavaScript
+        history_by_course = {}
+        for entry in attendance_history_qs:
+            course_name = f"{entry.session.course.code} - {entry.session.course.name}"
+            
+            # Use the session's start time as the general time reference if the 
+            # AttendanceEntry itself doesn't have a check-in time field, 
+            # or use 'created_at' if that exists. For robustness, using start_time.
+            timestamp_to_use = entry.session.start_time 
+            
+            serialized_entry = {
+                # This field is needed by the JS to parse the date
+                'timestamp': timestamp_to_use.isoformat(), 
+                'is_valid': entry.is_valid,
+                'session': {
+                    'name': entry.session.course.name,
+                    'code' : entry.session.course.code,
+                    # We only need the name for display, other data is redundant if the timestamp is present
+                },
+                'timestamp_display': entry.timestamp
+            }
+            
+            if course_name not in history_by_course:
+                history_by_course[course_name] = []
+            
+            history_by_course[course_name].append(serialized_entry)
+
+
+        # 8. Final Context Update
+        context.update({
+            'student': student,
+            'shared_courses': shared_courses_qs,
+            'context_course': context_course,
+            'attendance_stats': attendance_stats,
+            'monthly_stats': monthly_stats, 
+            'history_by_course': history_by_course, 
+        })
+        return context

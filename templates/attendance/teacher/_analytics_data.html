@@ -1,0 +1,134 @@
+{% comment %}
+File: attendance/teacher/_analytics_data.html
+This is the partial template that gets updated via AJAX.
+{% endcomment %}
+
+{% if has_data %}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="glass rounded-2xl p-6">
+            <div class="text-3xl font-bold text-primary-600 dark:text-primary-400">
+                {{ average_attendance|floatformat:0 }}%
+            </div>
+            <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                Average Attendance
+                <span class="font-normal text-xs text-slate-400">
+                    ({% if selected_date_filter == 'all' %}All Time{% else %}{{ display_date_range }}{% endif %})
+                </span>
+            </div>
+        </div>
+        <div class="glass rounded-2xl p-6">
+            <div class="text-3xl font-bold text-green-600 dark:text-green-400">{{ total_sessions }}</div>
+            <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                Total Sessions
+                <span class="font-normal text-xs text-slate-400">
+                    ({% if selected_date_filter == 'all' %}All Time{% else %}{{ display_date_range }}{% endif %})
+                </span>
+            </div>
+        </div>
+        <div class="glass rounded-2xl p-6">
+            <div class="text-3xl font-bold text-slate-700 dark:text-slate-300">{{ total_students }}</div>
+            <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                {% if is_master_view %}Total Unique Students{% else %}Total Students{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="glass rounded-2xl p-6 mb-8">
+        <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">
+            {% if is_fallback_view %}
+                Recent Attendance Trend (No sessions found today)
+            {% else %}
+                Attendance Trend
+            {% endif %}
+            <span class="text-sm font-normal text-slate-500 dark:text-slate-400 ml-2">
+                Showing {{ chart_labels|length }} days
+            </span>
+        </h2>
+        <div class="h-64 md:h-80">
+            <canvas id="attendanceChart"></canvas>
+        </div>
+        <script id="chart-data" type="application/json">
+            {
+                "labels": {{ chart_labels|safe }},
+                "data_pct": {{ chart_data_pct|safe }}
+            }
+        </script>
+    </div>
+
+    <div class="glass rounded-2xl p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-slate-900 dark:text-white">
+                {% if is_fallback_view %}
+                    Recent Session History
+                {% else %}
+                    Session History ({{ total_sessions }} sessions)
+                {% endif %}
+            </h2>
+            <a href="#session-history" class="text-sm font-semibold text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
+               onclick="document.getElementById('session-history').scrollIntoView({ behavior: 'smooth' }); return false;">
+                View Details ↓
+            </a>
+        </div>
+        <div id="session-history" class="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+           {% for data in attendance_data %}
+<a href="{% url 'teacher_daily_session_detail' data.course_id data.date %}"
+   class="block bg-white dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600 hover:shadow-lg transition duration-200">
+
+    <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center">
+            <span class="font-semibold text-slate-900 dark:text-white">{{ data.date }}</span>
+            {% if is_master_view %}
+                <span class="text-sm font-normal text-slate-500 dark:text-slate-400 ml-2">({{ data.course_name }})</span>
+            {% endif %}
+        </div>
+        
+        <span class="text-xs font-semibold text-primary-600 hover:text-primary-500 dark:text-primary-400">
+            View Sessions →
+        </span>
+    </div>
+
+    <div class="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-3 overflow-hidden">
+        <div class="bg-gradient-to-r from-primary-500 to-primary-700 h-full rounded-full transition-all duration-500"
+             style="width: {{ data.percentage }}%"></div>
+    </div>
+    
+    <div class="text-right mt-1">
+        <span class="text-sm font-semibold 
+            {% if data.percentage >= 80 %}text-green-600 dark:text-green-400
+            {% elif data.percentage >= 60 %}text-yellow-600 dark:text-yellow-400
+            {% else %}text-red-600 dark:text-red-400{% endif %}">
+            {{ data.percentage|floatformat:1 }}% ({{ data.present }} / {{ data.total }})
+        </span>
+    </div>
+</a>
+{% endfor %}
+        </div>
+    </div>
+
+{% else %}
+    <div class="glass rounded-2xl p-12 text-center">
+        <svg class="w-20 h-20 mx-auto text-slate-400 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+        </svg>
+        <h3 class="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No sessions found</h3>
+        <p class="text-slate-600 dark:text-slate-400">
+            No sessions were found for
+            <span class="font-semibold text-slate-800 dark:text-slate-200">
+                {% if selected_date_filter == 'today' %}today
+                {% elif selected_date_filter == 'week' %}this week
+                {% elif selected_date_filter == 'month' %}this month
+                {% elif selected_date_filter == 'all' %}all time
+                {% else %}{{ selected_date_filter }}
+                {% endif %}
+            </span>
+            {% if not is_master_view %}in this course.{% else %}across your courses.{% endif %}
+            
+            {% if selected_date_filter == 'today' %}
+                <br>
+                <span class="text-sm text-slate-500 dark:text-slate-500 mt-2 block">
+                    Note: If you expected data, try refreshing the page later.
+                </span>
+            {% endif %}
+        </p>
+    </div>
+{% endif %}

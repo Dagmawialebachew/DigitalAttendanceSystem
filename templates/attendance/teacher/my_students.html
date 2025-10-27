@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+
+{% block title %}My Students{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6 md:py-10 fade-in">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-1">
+            Student Roster
+        </h1>
+        <p class="text-slate-600 dark:text-slate-400">View and manage students enrolled in your courses.</p>
+    </div>
+
+    {# --- Course Selection Section: Mobile-friendly grid --- #}
+    <div class="glass rounded-2xl p-6 shadow-xl mb-8">
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4">Select Roster</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+            
+            {# --- 1. Master Roster Button (course_id=0 for AJAX) --- #}
+            <button type="button" 
+               class="course-select-btn p-3 md:p-4 rounded-xl text-center border-2 transition-all duration-200 text-sm cursor-pointer block w-full
+               {% if is_master_roster %}
+                   border-primary-500 bg-primary-50 dark:bg-primary-900/30 shadow-lg text-primary-700 dark:text-primary-300 font-semibold
+               {% else %}
+                   border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-700 hover:border-primary-400 hover:shadow-md text-slate-800 dark:text-white
+               {% endif %}"
+               data-course-id="0" 
+               data-course-url="{% url 'my_students' %}?course_id=0"> 
+                <p class="font-bold mb-0.5 truncate">All Students</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ student_count }} Total</p>
+            </button>
+
+            {# --- 2. Individual Course Buttons --- #}
+            {% for course in courses %}
+            <button type="button" 
+               class="course-select-btn p-3 md:p-4 rounded-xl text-center border-2 transition-all duration-200 text-sm cursor-pointer block w-full
+               {% if selected_course and selected_course.id == course.id %}
+                   border-primary-500 bg-primary-50 dark:bg-primary-900/30 shadow-lg text-primary-700 dark:text-primary-300 font-semibold
+               {% else %}
+                   border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-700 hover:border-primary-400 hover:shadow-md text-slate-800 dark:text-white
+               {% endif %}"
+               data-course-id="{{ course.id }}"
+               data-course-url="{% url 'my_students' %}?course_id={{ course.id }}"> 
+                <p class="font-bold mb-0.5 truncate">{{ course.code }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ course.student_count }} Students</p>
+            </button>
+            {% empty %}
+            {# ... empty state ... #}
+            {% endfor %}
+        </div>
+    </div>
+    
+    <hr class="border-slate-200 dark:border-slate-700">
+    
+    {# --- Students List Container (Dynamically updated content) --- #}
+    <div id="js-student-list-container" class="mt-8">
+        {% include 'attendance/teacher/_student_list_table.html' %} 
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('js-student-list-container');
+    const courseButtons = document.querySelectorAll('.course-select-btn');
+    
+    // Helper function to set the active course style
+    const setActiveStyle = (button) => {
+        courseButtons.forEach(btn => {
+            // Remove active classes from all
+            btn.classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/30', 'shadow-lg', 'text-primary-700', 'dark:text-primary-300', 'font-semibold');
+            // Add inactive classes to all
+            btn.classList.add('border-slate-200', 'dark:border-slate-700', 'bg-white', 'dark:bg-slate-700', 'hover:border-primary-400', 'hover:shadow-md', 'text-slate-800', 'dark:text-white');
+        });
+        // Set active classes on the selected button
+        button.classList.remove('border-slate-200', 'dark:border-slate-700', 'bg-white', 'dark:bg-slate-700', 'hover:border-primary-400', 'hover:shadow-md', 'text-slate-800', 'dark:text-white');
+        button.classList.add('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/30', 'shadow-lg', 'text-primary-700', 'dark:text-primary-300', 'font-semibold');
+    };
+
+    // 1. Initial State: Ensure one course is styled as selected
+    const initialSelected = document.querySelector('.course-select-btn.font-semibold');
+    if (!initialSelected && courseButtons.length > 0) {
+        // Default to the "All Students" button if no selection is made by the view
+        const allStudentsBtn = document.querySelector('[data-course-id="0"]');
+        if (allStudentsBtn) {
+            setActiveStyle(allStudentsBtn);
+        }
+    }
+
+    // 2. Event Listener for Course Buttons (AJAX/Fetch)
+    courseButtons.forEach(button => {
+        button.addEventListener('click', async () => {
+            // Prevent fetching if already selected
+            if (button.classList.contains('font-semibold')) return;
+            
+            const url = button.dataset.courseUrl; 
+            setActiveStyle(button);
+
+            // Show loading state and scroll (Excellent for mobile UX)
+            container.innerHTML = `
+                <div class="glass rounded-2xl p-6 shadow-xl mt-8 text-center">
+                    <i class="fas fa-spinner fa-spin text-4xl text-primary-500 mb-4"></i>
+                    <p class="text-slate-600 dark:text-slate-400">Loading student roster...</p>
+                </div>
+            `;
+            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            // Fetch the new student list
+            try {
+                const response = await fetch(url, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const htmlContent = await response.text();
+                container.innerHTML = htmlContent; 
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                container.innerHTML = `
+                    <div class="glass rounded-2xl p-6 shadow-xl mt-8 text-center border border-red-400 bg-red-50 dark:bg-red-900/20">
+                        <i class="fas fa-exclamation-triangle text-4xl text-red-600 mb-4"></i>
+                        <p class="text-red-800 dark:text-red-200">Failed to load student data. Please try again.</p>
+                    </div>
+                `;
+            }
+        });
+    });
+
+    // 3. WebSocket Integration (for live updates to count/roster)
+    // The WS logic should remain the same as provided previously, triggering a click
+    // on the relevant course button or the "All Students" button (data-course-id="0") 
+    // if the new enrollment affects the master list.
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/teacher_notifications/{{ user.id }}/`; 
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.type === 'new_enrollment' && data.data.course_id) {
+            const enrolledCourseId = data.data.course_id;
+            const currentSelectedButton = document.querySelector('.course-select-btn.font-semibold');
+            
+            // 1. Update the count on ALL relevant buttons (specific course and master roster)
+            courseButtons.forEach(btn => {
+                if (btn.dataset.courseId == enrolledCourseId || btn.dataset.courseId == '0') {
+                    // Note: This requires the WS data to also send the NEW student count
+                    // OR you must implement a system to increment the count displayed in the DOM.
+                    // For simplicity, we assume you'll update the count property in the backend.
+                    
+                    // Trigger a fetch if the current view is affected
+                    if (currentSelectedButton && currentSelectedButton.dataset.courseId == btn.dataset.courseId) {
+                        currentSelectedButton.click(); 
+                    }
+                }
+            });
+        }
+    };
+});
+</script>
+{% endblock %}

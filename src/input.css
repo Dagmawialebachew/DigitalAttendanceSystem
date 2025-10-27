@@ -83,6 +83,42 @@ body {
     padding-bottom: env(safe-area-inset-bottom); 
 }
 
+.notif-tab {
+                flex: 1;
+                padding: 0.5rem 1rem;
+                font-weight: 600;
+                color: #64748b; /* slate-500 */
+                border-radius: 0.5rem;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .dark .notif-tab {
+                color: #94a3b8; /* slate-400 */
+            }
+            .notif-tab:hover:not(.active) {
+                color: #475569; /* slate-600 */
+            }
+            .dark .notif-tab:hover:not(.active) {
+                color: #e2e8f0; /* slate-200 */
+            }
+            .notif-tab.active {
+                background-color: #4f46e5; /* primary-600 */
+                color: #ffffff;
+                box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3);
+            }
+            .dark .notif-tab.active {
+                background-color: #8b5cf6; /* primary-500 */
+                color: #ffffff;
+                box-shadow: 0 4px 10px rgba(139, 92, 246, 0.4);
+            }
+            
+            /* Keyframe for subtle pulse effect on unread dot */
+            @keyframes ping-slow {
+                0% { transform: scale(1); opacity: 1; }
+                100% { transform: scale(2.5); opacity: 0; }
+            }
+            .animate-ping-slow {
+                animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+            }
 
 
 /* Animations */

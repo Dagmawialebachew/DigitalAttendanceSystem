@@ -9,80 +9,383 @@
         <p class="text-slate-600 dark:text-slate-400">Track attendance trends and insights</p>
     </div>
 
-    <div class="glass rounded-2xl p-6 mb-6">
-        <form method="get" class="flex gap-4">
-            <select name="course" onchange="this.form.submit()"
-                    class="flex-1 px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white">
-                <option value="">Select a course</option>
+    <div class="glass rounded-2xl p-4 md:p-6 mb-6 space-y-4">
+        
+        <div>
+            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Filter by Course</label>
+            <div id="course-tabs-container" class="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+                {% with selected_course_id_str=selected_course_id|stringformat:"s" %}
+                <button 
+                    class="course-tab-btn flex-shrink-0 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-200
+                    {% if selected_course_id_str == '0' %}
+                        bg-primary-600 text-white shadow-md
+                    {% else %}
+                        bg-white text-slate-700 dark:bg-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600
+                    {% endif %}"
+                    data-course-id="0">
+                    All Courses
+                </button>
                 {% for course in courses %}
-                <option value="{{ course.id }}" {% if selected_course and selected_course.id == course.id %}selected{% endif %}>
-                    {{ course.name }} ({{ course.code }})
-                </option>
+                <button 
+                    class="course-tab-btn flex-shrink-0 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-200
+                    {% if selected_course_id_str == course.id|stringformat:"s" %}
+                        bg-primary-600 text-white shadow-md
+                    {% else %}
+                        bg-white text-slate-700 dark:bg-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600
+                    {% endif %}"
+                    data-course-id="{{ course.id }}">
+                    {{ course.code }}
+                </button>
                 {% endfor %}
-            </select>
-        </form>
-    </div>
-
-    {% if selected_course and attendance_data %}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="glass rounded-2xl p-6">
-            <div class="text-3xl font-bold text-primary-600 dark:text-primary-400">
-    {{ average_attendance|floatformat:0 }}%
-
+                {% endwith %}
             </div>
-            <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">Average Attendance</div>
         </div>
-        <div class="glass rounded-2xl p-6">
-            <div class="text-3xl font-bold text-green-600 dark:text-green-400">{{ attendance_data|length }}</div>
-            <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">Total Sessions</div>
+
+        <div>
+            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Filter by Date</label>
+            <div id="date-filter-container" class="flex flex-wrap items-center gap-2">
+                {% with df=selected_date_filter %}
+                <button class="date-filter-btn" data-filter="today"
+                    {% if df == 'today' %}aria-pressed="true"{% endif %}>Today</button>
+                <button class="date-filter-btn" data-filter="week"
+                    {% if df == 'week' %}aria-pressed="true"{% endif %}>This Week</button>
+                <button class="date-filter-btn" data-filter="month"
+                    {% if df == 'month' %}aria-pressed="true"{% endif %}>This Month</button>
+                <button class="date-filter-btn" data-filter="all"
+                    {% if df == 'all' %}aria-pressed="true"{% endif %}>All Time</button>
+
+                <input 
+                    type="date" 
+                    id="date-picker" 
+                    name="date"
+                    value="{% if df != 'today' and df != 'week' and df != 'month' and df != 'all' %}{{ df }}{% else %}{{ today_iso }}{% endif %}" 
+                    class="date-filter-btn"
+                    data-filter="custom"
+                    aria-pressed="{% if df != 'today' and df != 'week' and df != 'month' and df != 'all' %}true{% else %}false{% endif %}"
+                >
+                {% endwith %}
+            </div>
         </div>
-        <div class="glass rounded-2xl p-6">
-            <div class="text-3xl font-bold text-slate-700 dark:text-slate-300">{{ selected_course.students.count }}</div>
-            <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">Total Students</div>
-        </div>
+
     </div>
 
-    <div class="glass rounded-2xl p-6">
-        <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">Attendance Trend</h2>
-        <div class="space-y-4">
-            {% for data in attendance_data %}
-            <div class="bg-white dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="font-semibold text-slate-900 dark:text-white">{{ data.date }}</span>
-                    <span class="text-sm text-slate-600 dark:text-slate-400">{{ data.present }} / {{ data.total }}</span>
-                </div>
-                <div class="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-3 overflow-hidden">
-                    <div class="bg-gradient-to-r from-primary-500 to-primary-700 h-full rounded-full transition-all duration-500"
-                         style="width: {{ data.percentage }}%"></div>
-                </div>
-                <div class="text-right mt-1">
-                    <span class="text-sm font-semibold
-                        {% if data.percentage >= 80 %}text-green-600 dark:text-green-400
-                        {% elif data.percentage >= 60 %}text-yellow-600 dark:text-yellow-400
-                        {% else %}text-red-600 dark:text-red-400{% endif %}">
-                        {{ data.percentage|floatformat:1 }}%
-                    </span>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
+    <div id="analytics-container">
+        {% include 'attendance/teacher/_analytics_data.html' %}
     </div>
-    {% elif selected_course %}
-    <div class="glass rounded-2xl p-12 text-center">
-        <svg class="w-20 h-20 mx-auto text-slate-400 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-        </svg>
-        <h3 class="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No sessions yet</h3>
-        <p class="text-slate-600 dark:text-slate-400">Start attendance sessions to see analytics</p>
-    </div>
-    {% else %}
-    <div class="glass rounded-2xl p-12 text-center">
-        <svg class="w-20 h-20 mx-auto text-slate-400 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-        </svg>
-        <h3 class="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">Select a course</h3>
-        <p class="text-slate-600 dark:text-slate-400">Choose a course from the dropdown above to view analytics</p>
-    </div>
-    {% endif %}
+
 </div>
+
+<style>
+    .date-filter-btn {
+        flex-shrink: 0;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem; /* rounded-lg */
+        font-size: 0.875rem; /* text-sm */
+        font-weight: 600; /* font-semibold */
+        transition: all 0.2s ease;
+        border: 2px solid transparent;
+        /* Inactive state */
+        background-color: #ffffff; /* bg-white */
+        color: #334155; /* text-slate-700 */
+    }
+    .dark .date-filter-btn {
+        background-color: #334155; /* dark:bg-slate-700 */
+        color: #e2e8f0; /* dark:text-slate-200 */
+    }
+    .date-filter-btn:not([aria-pressed="true"]):hover {
+        background-color: #f8fafc; /* hover:bg-slate-50 */
+    }
+    .dark .date-filter-btn:not([aria-pressed="true"]):hover {
+        background-color: #475569; /* dark:hover:bg-slate-600 */
+    }
+
+    /* Active (aria-pressed) state */
+    .date-filter-btn[aria-pressed="true"] {
+        background-color: #4f46e5; /* bg-primary-600 */
+        color: #ffffff; /* text-white */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+    }
+
+    /* Special styling for the date picker */
+    input[type="date"].date-filter-btn {
+        min-width: 140px;
+    }
+    /* When active, give it a colored border instead of bg */
+    input[type="date"].date-filter-btn[aria-pressed="true"] {
+        border-color: #4f46e5; /* border-primary-600 */
+        background-color: #ffffff; /* bg-white */
+        color: #334155; /* text-slate-700 */
+        box-shadow: none;
+    }
+    .dark input[type="date"].date-filter-btn[aria-pressed="true"] {
+        background-color: #334155; /* dark:bg-slate-700 */
+        color: #e2e8f0; /* dark:text-slate-200 */
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- 1. Get Elements ---
+    const analyticsContainer = document.getElementById('analytics-container');
+    const courseTabsContainer = document.getElementById('course-tabs-container');
+    const dateFilterContainer = document.getElementById('date-filter-container');
+    const datePicker = document.getElementById('date-picker');
+    
+    // Course Tab styling classes
+    const courseActiveTabClasses = ['bg-primary-600', 'text-white', 'shadow-md'];
+    const courseInactiveTabClasses = ['bg-white', 'text-slate-700', 'dark:bg-slate-700', 'dark:text-slate-200', 'hover:bg-slate-50', 'dark:hover:bg-slate-600'];
+    
+    // localStorage keys
+    const COURSE_FILTER_KEY = 'analyticsCourseFilter';
+    const DATE_FILTER_KEY = 'analyticsDateFilter';
+
+    // --- 2. Chart Helper: Aggregate Data by Day ---
+    /**
+     * Averages multiple data points for the same day.
+     * This fixes the chart showing multiple '2025-10-19' bars.
+     */
+    function aggregateChartData(rawLabels, rawDataPct) {
+        const dailyData = {}; // Stores { sum: X, count: Y } for each date
+
+        rawLabels.forEach((label, index) => {
+            if (!dailyData[label]) {
+                dailyData[label] = { sum: 0, count: 0 };
+            }
+            dailyData[label].sum += rawDataPct[index];
+            dailyData[label].count += 1;
+        });
+
+        // Get unique, sorted dates
+        const sortedLabels = Object.keys(dailyData).sort();
+
+        // Calculate the average for each day
+        const aggregatedData = sortedLabels.map(label => {
+            const data = dailyData[label];
+            return data.sum / data.count; // Return the average
+        });
+
+        return {
+            labels: sortedLabels,
+            data: aggregatedData
+        };
+    }
+
+    // --- 3. Chart Function (FIXED) ---
+    function initOrUpdateChart() {
+        const chartCanvas = document.getElementById('attendanceChart');
+        if (!chartCanvas) return;
+        const ctx = chartCanvas.getContext('2d');
+        const chartDataEl = document.getElementById('chart-data');
+        if (!chartDataEl) return;
+        
+        const rawData = JSON.parse(chartDataEl.textContent);
+
+        // Aggregate data to show daily averages, not every single session
+        const { labels, data } = aggregateChartData(rawData.labels, rawData.data_pct);
+
+        if (window.myAttendanceChart) {
+            window.myAttendanceChart.destroy();
+        }
+
+        // --- THIS IS THE CONFIG YOU WERE MISSING ---
+        window.myAttendanceChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels, // Use aggregated labels
+                datasets: [{
+                    label: 'Avg. Attendance %',
+                    data: data, // Use aggregated data
+                    backgroundColor: 'rgba(79, 70, 229, 0.6)', // primary-600
+                    borderColor: 'rgba(79, 70, 229, 1)',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) { return value + '%'; }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                // Show average in tooltip
+                                return ` ${context.parsed.y.toFixed(1)}% (Avg)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        // --- END OF MISSING CONFIG ---
+    }
+    
+    // --- 4. Central Fetch Function ---
+    function fetchAnalytics() {
+        // Get active course
+        const activeCourseTab = courseTabsContainer.querySelector('.bg-primary-600');
+        const selectedCourseId = activeCourseTab ? activeCourseTab.dataset.courseId : '0';
+        
+        // Get active date filter
+        const activeDateFilter = dateFilterContainer.querySelector('[aria-pressed="true"]');
+        let dateFilterValue = 'today'; // Default
+        if (activeDateFilter) {
+            if (activeDateFilter.dataset.filter === 'custom') {
+                dateFilterValue = activeDateFilter.value; // Get YYYY-MM-DD from calendar
+            } else {
+                dateFilterValue = activeDateFilter.dataset.filter; // 'today', 'week', etc.
+            }
+        }
+
+        const url = new URL(window.location.pathname, window.location.origin);
+        url.searchParams.set('course', selectedCourseId);
+        url.searchParams.set('date_filter', dateFilterValue);
+
+        analyticsContainer.style.opacity = '0.5';
+        analyticsContainer.style.transition = 'opacity 0.3s ease';
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(response => response.text())
+        .then(html => {
+            analyticsContainer.innerHTML = html;
+            window.history.pushState({ path: url.href }, '', url.href);
+            initOrUpdateChart(); // Re-run chart logic
+            analyticsContainer.style.opacity = '1';
+        })
+        .catch(error => {
+            console.error('Error fetching analytics:', error);
+            analyticsContainer.style.opacity = '1';
+        });
+    }
+
+    // --- 5. Helper functions for Filters ---
+    function updateActiveDateFilter(activeElement) {
+        const allDateFilters = dateFilterContainer.querySelectorAll('[data-filter]');
+        allDateFilters.forEach(el => {
+            el.setAttribute('aria-pressed', el === activeElement ? 'true' : 'false');
+        });
+    }
+
+    function saveFilters() {
+        const activeCourseTab = courseTabsContainer.querySelector('.bg-primary-600');
+        const courseId = activeCourseTab ? activeCourseTab.dataset.courseId : '0';
+        
+        const activeDateFilter = dateFilterContainer.querySelector('[aria-pressed="true"]');
+        let dateFilterValue = 'today';
+        if (activeDateFilter) {
+            if (activeDateFilter.dataset.filter === 'custom') {
+                dateFilterValue = activeDateFilter.value;
+            } else {
+                dateFilterValue = activeDateFilter.dataset.filter;
+            }
+        }
+        
+        localStorage.setItem(COURSE_FILTER_KEY, courseId);
+        localStorage.setItem(DATE_FILTER_KEY, dateFilterValue);
+    }
+
+    function loadAndApplyFilters() {
+        const savedCourseId = localStorage.getItem(COURSE_FILTER_KEY);
+        const savedDateFilter = localStorage.getItem(DATE_FILTER_KEY);
+
+        let filtersChanged = false;
+        const currentActiveCourse = courseTabsContainer.querySelector('.bg-primary-600');
+        const currentActiveDate = dateFilterContainer.querySelector('[aria-pressed="true"]');
+
+        // Apply saved course filter
+        if (savedCourseId && (!currentActiveCourse || currentActiveCourse.dataset.courseId !== savedCourseId)) {
+            const newActiveCourse = courseTabsContainer.querySelector(`[data-course-id="${savedCourseId}"]`);
+            if (newActiveCourse) {
+                if (currentActiveCourse) {
+                    currentActiveCourse.classList.remove(...courseActiveTabClasses);
+                    currentActiveCourse.classList.add(...courseInactiveTabClasses);
+                }
+                newActiveCourse.classList.add(...courseActiveTabClasses);
+                newActiveCourse.classList.remove(...courseInactiveTabClasses);
+                filtersChanged = true;
+            }
+        }
+
+        // Apply saved date filter
+        const currentFilterValue = (currentActiveDate.dataset.filter === 'custom') ? currentActiveDate.value : currentActiveDate.dataset.filter;
+        if (savedDateFilter && currentFilterValue !== savedDateFilter) {
+            let newActiveDateFilter = dateFilterContainer.querySelector(`button[data-filter="${savedDateFilter}"]`);
+            if (newActiveDateFilter) {
+                updateActiveDateFilter(newActiveDateFilter); // Activate a preset tab
+            } else {
+                // It's a custom date
+                datePicker.value = savedDateFilter;
+                updateActiveDateFilter(datePicker); // Activate the calendar
+            }
+            filtersChanged = true;
+        }
+        
+        return filtersChanged;
+    }
+    
+    // --- 6. Event Listeners ---
+    
+    // Course Tabs
+    courseTabsContainer.addEventListener('click', function(e) {
+        const clickedButton = e.target.closest('.course-tab-btn');
+        if (!clickedButton || clickedButton.classList.contains('bg-primary-600')) return;
+        
+        const oldActiveButton = courseTabsContainer.querySelector('.bg-primary-600');
+        if (oldActiveButton) {
+            oldActiveButton.classList.remove(...courseActiveTabClasses);
+            oldActiveButton.classList.add(...courseInactiveTabClasses);
+        }
+        clickedButton.classList.add(...courseActiveTabClasses);
+        clickedButton.classList.remove(...courseInactiveTabClasses);
+        clickedButton.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        
+        fetchAnalytics();
+        saveFilters(); // Save choice
+    });
+    
+    // Date Filter Tabs (Buttons)
+    dateFilterContainer.addEventListener('click', function(e) {
+        const clickedButton = e.target.closest('button.date-filter-btn');
+        if (!clickedButton || clickedButton.getAttribute('aria-pressed') === 'true') return;
+        
+        updateActiveDateFilter(clickedButton);
+        fetchAnalytics();
+        saveFilters(); // Save choice
+    });
+
+    // Date Picker (Calendar)
+    datePicker.addEventListener('change', function(e) {
+        updateActiveDateFilter(e.target);
+        fetchAnalytics();
+        saveFilters(); // Save choice
+    });
+    
+    // --- 7. Initial Run ---
+    // Load filters from storage and apply them to the UI
+    const filtersWereLoaded = loadAndApplyFilters();
+    
+    if (filtersWereLoaded) {
+        // If we loaded filters from storage, the Django-rendered HTML
+        // is now out of sync. Re-fetch to get the correct data.
+        fetchAnalytics();
+    } else {
+        // Otherwise, just initialize the chart with the data Django gave us.
+        initOrUpdateChart();
+    }
+});
+</script>
 {% endblock %}

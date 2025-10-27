@@ -1,0 +1,150 @@
+{% load static custom_filters %}
+{% if students_data %}
+<div class="glass rounded-2xl p-4 md:p-6 shadow-xl">
+    <h2 class="text-xl md:text-2xl font-bold text-slate-900 dark:text-white mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 dark:border-slate-700 pb-3">
+        {% if selected_course %}
+            Roster for: <span class="text-primary-600 dark:text-primary-400 ml-0 sm:ml-2 mt-1 sm:mt-0">{{ selected_course.name|truncatechars:35 }} ({{ selected_course.code }})</span>
+        {% else %}
+            Master Roster (All Courses)
+        {% endif %}
+        <span class="text-base font-medium text-slate-600 dark:text-slate-400 mt-2 sm:mt-0">{{ students_data|length }} Students</span>
+    </h2>
+    
+    
+    {# --- Desktop/Tablet Table View (Hidden on mobile) --- #}
+    <div class="hidden sm:block overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+            <thead>
+                <tr class="text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/50">
+                    <th class="px-4 py-3">Student Name / ID</th>
+                    <th class="px-4 py-3">Courses</th>
+                    <th class="px-4 py-3 text-center">Pts</th>
+                    <th class="px-4 py-3 text-center">Presents ({{ current_month }})</th>
+                    <th class="px-4 py-3 text-center">Absences ({{ current_month }})</th>
+                    <th class="px-4 py-3 text-center">Rate</th>
+                    <th class="px-4 py-3 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+                {% for data in students_data %}
+                    {% with student=data.student courses=data.courses %}
+                    <tr class="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition duration-150">
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <div class="text-sm font-medium text-slate-900 dark:text-white">{{ student.get_full_name|default:student.email }}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">ID: {{ student.student_profile.student_id|default:"N/A" }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                            {% for course in courses %}
+                                <span class="inline-block bg-primary-100 dark:bg-primary-900/50 text-primary-800 dark:text-primary-300 text-xs font-medium mr-1 mb-1 px-2.5 py-0.5 rounded-full">{{ course.code }}</span>
+                            {% endfor %}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-center text-primary-600 dark:text-primary-400">
+                            {{ student.gamification_points.total_points|default:"0" }}
+                        </td>
+                        
+                        {# ATTENDANCE COLUMNS #}
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-center font-medium text-success-600 dark:text-success-400">
+                            {{ student.month_presents|default:"0" }}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-center font-medium text-red-600 dark:text-red-400">
+                            {{ student.month_absences|default:"0" }}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-center 
+                            {% if student.attendance_rate != 'N/A' and student.attendance_rate|to_int >= 90 %}text-success-600 dark:text-success-400
+                            {% elif student.attendance_rate != 'N/A' and student.attendance_rate|to_int >= 70 %}text-warning-600 dark:text-warning-400
+                            {% elif student.attendance_rate != 'N/A' %}text-red-600 dark:text-red-400
+                            {% else %}text-slate-400{% endif %}">
+                            {% if student.attendance_rate == 'N/A' %}
+                                N/A
+                            {% else %}
+                                {{ student.attendance_rate }}%
+                            {% endif %}
+                        </td>
+                        {# END ATTENDANCE COLUMNS #}
+
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-right">
+                            <a href="{% url 'student_detail_teacher' course_id=courses.0.id student_id=student.id %}" 
+                               class="text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-200 transition-colors">
+                                View &rarr;
+                            </a>
+                        </td>
+                    </tr>
+                    {% endwith %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# --- Mobile Card View (Hidden on tablet/desktop) --- #}
+    <div class="sm:hidden space-y-3">
+        {% for data in students_data %}
+            {% with student=data.student courses=data.courses %}
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <div class="font-bold text-slate-900 dark:text-white leading-tight">{{ student.get_full_name|default:student.email }}</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400 mb-2">ID: {{ student.student_profile.student_id|default:"N/A" }}</div>
+                        <div class="flex flex-wrap gap-1">
+                            {% for course in courses %}
+                                <span class="bg-primary-100 dark:bg-primary-900/50 text-primary-800 dark:text-primary-300 text-xs font-medium px-2 py-0.5 rounded-full">{{ course.code }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <a href="{% url 'student_detail_teacher' course_id=courses.0.id student_id=student.id %}" 
+                       class="flex-shrink-0 text-sm font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-200 transition-colors mt-1">
+                        Profile &rarr;
+                    </a>
+                </div>
+                
+                {# ATTENDANCE STATS GRID (MOBILE) #}
+                <div class="grid grid-cols-3 gap-3 text-xs border-t border-slate-100 dark:border-slate-700 pt-3 mt-3">
+                    
+                    {# Attendance Rate #}
+                    <div class="text-center">
+                        <p class="font-medium text-slate-600 dark:text-slate-400 mb-0.5">Rate</p>
+                        <p class="font-bold text-base 
+                            {% if student.attendance_rate != 'N/A' and student.attendance_rate|to_int >= 90 %}text-success-600 dark:text-success-400
+                            {% elif student.attendance_rate != 'N/A' and student.attendance_rate|to_int >= 70 %}text-warning-600 dark:text-warning-400
+                            {% elif student.attendance_rate != 'N/A' %}text-red-600 dark:text-red-400
+                            {% else %}text-slate-400{% endif %}">
+                            {% if student.attendance_rate == 'N/A' %}
+                                N/A
+                            {% else %}
+                                {{ student.attendance_rate }}%
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    {# Presents #}
+                    <div class="text-center">
+                        <p class="font-medium text-slate-600 dark:text-slate-400 mb-0.5">Presents ({{ current_month }})</p>
+                        <p class="font-bold text-base text-success-600 dark:text-success-400">{{ student.month_presents|default:"0" }}</p>
+                    </div>
+
+                    {# Absences #}
+                    <div class="text-center">
+                        <p class="font-medium text-slate-600 dark:text-slate-400 mb-0.5">Absences ({{ current_month }})</p>
+                        <p class="font-bold text-base text-red-600 dark:text-red-400">{{ student.month_absences|default:"0" }}</p>
+                    </div>
+                </div>
+                
+                {# Total Points #}
+                <div class="flex justify-between text-sm border-t border-slate-100 dark:border-slate-700 pt-2 mt-2">
+                    <span class="text-slate-600 dark:text-slate-400">Total Points:</span>
+                    <span class="font-semibold text-primary-600 dark:text-primary-400">
+                        {{ student.gamification_points.total_points|default:"0" }} pts
+                    </span>
+                </div>
+            </div>
+            {% endwith %}
+        {% endfor %}
+    </div>
+
+</div>
+{% else %}
+<div class="glass rounded-2xl p-8 text-center">
+    <i class="fas fa-users-slash text-6xl text-slate-400 dark:text-slate-600 mb-4"></i>
+    <h3 class="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No Students Enrolled</h3>
+    <p class="text-slate-600 dark:text-slate-400">There are no students in this roster. Please check your course enrollment or select another course.</p>
+</div>
+{% endif %}

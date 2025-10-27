@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+
+{% block title %}Daily Roster Detail{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-6 fade-in">
+
+    <a href="{% url 'analytics' %}?course={{ course.id }}&date_filter={{ target_date|date:'Y-m-d' }}" 
+       class="inline-flex items-center text-sm font-semibold text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 mb-6">
+        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        Back to Analytics
+    </a>
+
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-1">
+            Live Roster: {{ course.code }}
+        </h1>
+        <p class="text-xl font-semibold text-primary-600 dark:text-primary-400">
+            Attendance Status for {{ target_date|date:"l, F jS, Y" }}
+        </p>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-2">
+            Status based on **last completed session** of the day. Refreshes automatically.
+        </p>
+    </div>
+
+    {% if has_sessions %}
+        <div class="glass rounded-2xl p-6">
+            
+            <div id="filter-tabs" class="flex items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-600 pb-2">
+                <button class="tab-btn active" data-filter="all">All (<span id="count-all">0</span>)</button>
+                <button class="tab-btn" data-filter="P">Present (<span id="count-P">0</span>)</button>
+                <button class="tab-btn" data-filter="A">Absent (<span id="count-A">0</span>)</button>
+            </div>
+
+            <div id="student-roster" class="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
+                </div>
+            
+            <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-600">
+                <p class="text-sm text-slate-500 dark:text-slate-400" id="last-updated">Last Updated: Just now</p>
+            </div>
+
+        </div>
+    {% else %}
+        <div class="glass rounded-2xl p-10 text-center">
+            <svg class="w-16 h-16 mx-auto text-slate-400 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">...</svg>
+            <h3 class="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No Sessions Completed</h3>
+            <p class="text-slate-600 dark:text-slate-400">
+                No attendance sessions have been completed for {{ course.code }} on this date yet.
+            </p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const rosterContainer = document.getElementById('student-roster');
+        const filterTabs = document.getElementById('filter-tabs');
+        const lastUpdatedEl = document.getElementById('last-updated');
+        const countAllEl = document.getElementById('count-all');
+        const countPEl = document.getElementById('count-P');
+        const countAEl = document.getElementById('count-A');
+        const courseId = '{{ course.id }}';
+        
+        let currentRoster = JSON.parse('{{ initial_roster_json|escapejs }}');
+        let activeFilter = 'all';
+        const detailUrl = window.location.href.split('?')[0]; // Current URL without query params
+
+        // --- 1. Rendering Function ---
+        function renderRoster() {
+            let filteredRoster = currentRoster;
+
+            if (activeFilter !== 'all') {
+                filteredRoster = currentRoster.filter(student => student.status === activeFilter);
+            }
+
+            // Sort by name (A-Z)
+            filteredRoster.sort((a, b) => a.name.localeCompare(b.name));
+
+            rosterContainer.innerHTML = '';
+            
+            if (filteredRoster.length === 0) {
+                rosterContainer.innerHTML = '<p class="text-center text-slate-500 dark:text-slate-400 py-8">No students found matching this status.</p>';
+            }
+
+            filteredRoster.forEach(student => {
+                const isPresent = student.status === 'P';
+                const statusColor = isPresent ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+                const statusText = isPresent ? 'Present' : 'Absent';
+                
+                // Construct the destination URL using student.id and courseId
+                // We assume the Django URL resolver handles the path construction on the client side
+                // For demonstration, we use a placeholder link structure that JS can handle:
+                const detailUrl = `/teacher/student/${courseId}/${student.id}/`;
+
+                const html = `
+                    <a href="${detailUrl}" class="block">
+                        <div class="flex justify-between items-center bg-white dark:bg-slate-700 rounded-lg p-3 shadow-sm border border-slate-100 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition duration-200 cursor-pointer">
+                            <span class="font-medium text-slate-800 dark:text-slate-200">${student.name}</span>
+                            <span class="font-semibold ${statusColor} text-sm flex items-center">
+                                ${statusText}
+                                <svg class="w-4 h-4 ml-2 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </span>
+                        </div>
+                    </a>
+                `;
+                rosterContainer.insertAdjacentHTML('beforeend', html);
+            });
+            
+            // Update Counts
+            countAllEl.textContent = currentRoster.length;
+            countPEl.textContent = currentRoster.filter(s => s.status === 'P').length;
+            countAEl.textContent = currentRoster.filter(s => s.status === 'A').length;
+        }
+
+        // --- 2. Live Data Fetcher ---
+        function fetchLiveRoster() {
+            fetch(detailUrl, { 
+                headers: { 'X-Requested-With': 'XMLHttpRequest' } 
+            })
+            .then(response => response.json())
+            .then(data => {
+                currentRoster = data.roster;
+                renderRoster();
+                lastUpdatedEl.textContent = `Last Updated: ${new Date().toLocaleTimeString()}`;
+            })
+            .catch(error => {
+                console.error('Error fetching live roster:', error);
+                lastUpdatedEl.textContent = `Last Updated: Failed to fetch`;
+            });
+        }
+
+        // --- 3. Event Listeners ---
+        filterTabs.addEventListener('click', function(e) {
+            const button = e.target.closest('.tab-btn');
+            if (!button) return;
+
+            // Update active state
+            filterTabs.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+
+            activeFilter = button.dataset.filter;
+            renderRoster();
+        });
+
+        // Initial render
+        renderRoster(); 
+        
+        // --- 4. Live Refresh (Every 30 seconds) ---
+        const refreshInterval = 30000; // 30 seconds
+        setInterval(fetchLiveRoster, refreshInterval);
+        
+        // --- CSS for Tabs (Embedded for simplicity) ---
+        const style = document.createElement('style');
+        style.innerHTML = `
+            .tab-btn {
+                padding: 0.5rem 1rem;
+                border-radius: 0.5rem;
+                font-weight: 600;
+                transition: all 0.2s;
+                color: #64748b; /* slate-500 */
+                background: transparent;
+                border: none;
+            }
+            .dark .tab-btn {
+                color: #94a3b8; /* slate-400 */
+            }
+            .tab-btn.active {
+                color: #4f46e5; /* primary-600 */
+                border-bottom: 2px solid #4f46e5; /* primary-600 */
+                margin-bottom: -2px;
+            }
+            .dark .tab-btn.active {
+                color: #a78bfa; /* primary-400 */
+                border-bottom-color: #a78bfa;
+            }
+        `;
+        document.head.appendChild(style);
+    });
+</script>
+{% endblock %}

@@ -1,95 +1,339 @@
 {% extends 'base.html' %}
+{% load static %}
+{% load i18n %}
 
 {% block title %}Notifications{% endblock %}
 
+{% comment %} 
+    NOTE: This template assumes you have included the Font Awesome library 
+    in your base.html file.
+{% endcomment %}
+
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 py-6 fade-in">
-    <div class="mb-8">
-        <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">Notifications</h1>
-        <p class="text-slate-600 dark:text-slate-400">Stay updated with your attendance activities</p>
+<div class="max-w-4xl mx-auto px-4 py-8 fade-in">
+    <div class="mb-10">
+        <h1 class="text-4xl font-extrabold text-slate-900 dark:text-white mb-2 tracking-tight">Your Inbox 📬</h1>
+        <p class="text-lg text-slate-600 dark:text-slate-400">Stay organized with all your attendance alerts and updates.</p>
     </div>
 
-    <div class="glass rounded-2xl p-6">
-        {% if notifications %}
-        <div class="space-y-3">
-            {% for notification in notifications %}
-            <div class="bg-white dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600 {% if not notification.is_read %}border-l-4 border-l-primary-500{% endif %}">
-                <div class="flex items-start justify-between">
-                    <div class="flex-1">
-                        <div class="flex items-center space-x-2 mb-2">
-                            <span class="px-2 py-1 rounded-full text-xs font-semibold
-                                {% if notification.notification_type == 'session_started' %}bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300
-                                {% elif notification.notification_type == 'attendance_marked' %}bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300
-                                {% elif notification.notification_type == 'badge_earned' %}bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300
-                                {% else %}bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300{% endif %}">
-                                {{ notification.get_notification_type_display }}
-                            </span>
-                            {% if not notification.is_read %}
-                            <span class="w-2 h-2 bg-primary-500 rounded-full"></span>
-                            {% endif %}
-                        </div>
-                        <h3 class="font-semibold text-slate-900 dark:text-white mb-1">{{ notification.title }}</h3>
-                        <p class="text-sm text-slate-600 dark:text-slate-400 mb-2">{{ notification.message }}</p>
-                        <div class="text-xs text-slate-500 dark:text-slate-500">{{ notification.created_at|timesince }} ago</div>
-                    </div>
-                    {% if not notification.is_read %}
-                    <button onclick="markAsRead({{ notification.id }})"
-                            class="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-semibold">
-                        Mark read
-                    </button>
-                    {% endif %}
-                </div>
-                {% if notification.link and user.is_student %}
+    <div class="glass rounded-3xl p-8 shadow-2xl dark:shadow-slate-900/50">
+        
+        <div id="filter-tabs" class="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-8 sticky top-0 z-10 transition duration-300">
+            <button class="notif-tab active" data-filter="all">All</button>
+            
+            {% if user.is_teacher or user.is_admin_role %} 
+                <button class="notif-tab" data-filter="session_summary">Summaries</button>
+                <button class="notif-tab" data-filter="absent_alert">Alerts</button>
+            {% endif %}
+            
+            {% if user.is_student %}
+                <button class="notif-tab" data-filter="attendance_marked">Attendance</button>
+                <button class="notif-tab" data-filter="badge_earned">Badges</button>
+            {% endif %}
+        </div>
 
-                <a href="{{ notification.link }}"
-                   class="block mt-3 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-semibold">
-                    View details →
-                </a>
-                {% endif %}
-            </div>
+        {% if notifications %}
+        <div id="notification-list" class="space-y-4">
+            {% for notification in notifications %}
+            {% with notif_type=notification.notification_type %}
+            {% with link_details=notification.analytics_link_data %}
+                
+                {% comment %} 
+                    FINAL FIX: Use nested {% with %} blocks that open and close 
+                    immediately within the IF/ELIF structure. 
+                    This keeps the IF/ELIF clean and ensures every WITH is closed.
+                {% endcomment %}
+                
+                {# 1. Set Default/Fallback Values #}
+                {% with icon_class='fa-solid fa-bell' color_class='text-primary-600 text-2xl  dark:text-primary-600 ' %}
+
+                    {# 2. Conditional Overrides (Assigning the same variable names) #}
+                    {% if notif_type == 'session_started' %}
+                        {% with icon_class='fa-regular fa-clock' color_class='text-blue-500' %}{% endwith %}
+                    {% elif notif_type == 'session_summary' %}
+                        {% with icon_class='fa-solid fa-chart-bar' color_class='text-purple-500' %}{% endwith %}
+                    {% elif notif_type == 'attendance_marked' %}
+                        {% with icon_class='fa-solid fa-circle-check' color_class='text-green-500' %}{% endwith %}
+                    {% elif notif_type == 'badge_earned' or notif_type == 'student_milestone' %}
+                        {% with icon_class='fa-solid fa-trophy' color_class='text-yellow-500' %}{% endwith %}
+                    {% elif notif_type == 'unusual_attendance' or notif_type == 'absence_pattern' %}
+                        {% with icon_class='fa-solid fa-triangle-exclamation' color_class='text-red-500' %}{% endwith %}
+                    {# The default values will be used if none of the elif blocks match #}
+                    {% endif %}
+                
+                    {# 3. The card content uses the final icon_class and color_class variables #}
+                    <div id="notif-{{ notification.id }}" 
+                        data-id="{{ notification.id }}" 
+                        data-type="{{ notif_type }}"
+                        data-read="{{ notification.is_read|lower }}"
+                        data-link-details="{{ link_details|default_if_none:'' }}" 
+                        data-simple-link="{{ notification.link|default_if_none:'' }}"
+                        class="notif-card flex p-5 rounded-2xl transition duration-300 ease-in-out group 
+                        {% if link_details or notification.link %}cursor-pointer hover:shadow-xl dark:hover:shadow-primary-900/50 hover:bg-slate-50 dark:hover:bg-slate-600/50{% endif %}
+                        {% if notification.is_read %} 
+                            bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 
+                        {% else %} 
+                            bg-white dark:bg-slate-700 shadow-lg shadow-primary-100/30 dark:shadow-none border border-primary-300/50 dark:border-primary-500/30 font-medium 
+                        {% endif %}">
+                        
+                        <div class="flex-shrink-0 relative w-10 mt-0.5">
+                            {% if not notification.is_read %}
+                                <span class="absolute top-0 right-0 w-2.5 h-2.5 bg-primary-500 rounded-full animate-ping-slow"></span>
+                                <span class="absolute top-0 right-0 w-2.5 h-2.5 bg-primary-600 rounded-full"></span>
+                            {% endif %}
+                            <i class="fa-2x {{ icon_class }} {{ color_class }}"></i>
+                        </div>
+
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs font-bold uppercase tracking-widest text-primary-600 dark:text-primary-400">
+                                        {{ notification.get_notification_type_display }}
+                                    </span>
+                                    <div class="text-xs text-slate-500 dark:text-slate-500">{{ notification.created_at|timesince }} ago</div>
+                                </div>
+                            
+                                {% if link_details or notification.link %}
+                                <span class="text-primary-600 dark:text-primary-400 text-sm font-bold ml-4 flex-shrink-0 opacity-75 group-hover:opacity-100 hidden sm:inline-block">
+                                    View <i class="fa-solid fa-arrow-right ml-1"></i>
+                                </span>
+                                {% endif %}
+                            </div>
+                            
+                            <h3 class="font-extrabold text-slate-900 dark:text-white mt-0.5 mb-1 leading-snug text-lg">
+                                {{ notification.title }}
+                            </h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
+                                {{ notification.message }}
+                            </p>
+                        </div>
+                    </div>
+                {% endwith %} {% comment %} End of the main icon_class/color_class WITH block {% endcomment %}
+            {% endwith %} 
+            {% endwith %}
             {% endfor %}
         </div>
+        
+        <div id="no-notifications" class="text-center py-16 hidden">
+            <i class="fa-solid fa-check-double w-24 h-24 mx-auto text-slate-300 dark:text-slate-600 mb-6 fa-3x"></i>
+            <h3 class="text-2xl font-bold text-slate-700 dark:text-slate-300 mb-2">Silence is Golden! ☀️</h3>
+            <p class="text-slate-500 dark:text-slate-400">You're all caught up. No updates found matching this filter.</p>
+        </div>
+        
         {% else %}
-        <div class="text-center py-12">
-            <svg class="w-20 h-20 mx-auto text-slate-400 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-            </svg>
-            <h3 class="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No notifications yet</h3>
-            <p class="text-slate-600 dark:text-slate-400">You'll see updates about your attendance here</p>
+        <div class="text-center py-16">
+            <i class="fa-solid fa-bell w-24 h-24 mx-auto text-slate-300 dark:text-slate-600 mb-6 fa-3x"></i>
+            <h3 class="text-2xl font-bold text-slate-700 dark:text-slate-300 mb-2">No notifications yet 😟</h3>
+            <p class="text-slate-500 dark:text-slate-400">You'll see updates about your courses and attendance here.</p>
         </div>
         {% endif %}
     </div>
 </div>
 {% endblock %}
-
 {% block extra_js %}
 <script>
-    async function markAsRead(notificationId) {
+    // These variables are needed for both the swipe logic and the initial run
+    const notificationList = document.getElementById('notification-list');
+    const noNotifsMessage = document.getElementById('no-notifications');
+    let allNotificationCards = Array.from(document.querySelectorAll('.notif-card'));
+    
+    // Get all filter buttons for easy iteration in the swipe logic
+    const tabButtons = Array.from(document.querySelectorAll('.notif-tab'));
+
+    // --- Intersection Observer Logic (Kept from previous successful version) ---
+    async function markAsRead(notificationId, cardElement) {
+        if (cardElement.dataset.read === 'true') return;
+        
         try {
-            const response = await fetch(`/notifications/${notificationId}/read/`, {
+            const response = await fetch('/notifications/', {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': '{{ csrf_token }}',
                     'X-Requested-With': 'XMLHttpRequest',
-                }
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `notification_id=${notificationId}`
             });
 
             if (response.ok) {
-                location.reload();
+                // INSTANT UI UPDATE
+                cardElement.dataset.read = 'true';
+                
+                // Remove UNREAD classes and add READ classes
+                cardElement.classList.remove('font-medium', 'shadow-lg', 'shadow-primary-100/30', 'border-primary-300/50', 'dark:border-primary-500/30');
+                cardElement.classList.remove('bg-white', 'dark:bg-slate-700');
+                
+                cardElement.classList.add('bg-white', 'dark:bg-slate-800', 'border-slate-200', 'dark:border-slate-700', 'text-slate-600', 'dark:text-slate-400');
+                
+                // Remove the unread dots (both the ping and the solid dot)
+                const unreadDots = cardElement.querySelectorAll('.w-2\\.5\\.h-2\\.5');
+                unreadDots.forEach(dot => dot.remove());
+                
+                observer.unobserve(cardElement); 
             }
         } catch (error) {
             console.error('Error marking notification as read:', error);
         }
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/notifications/`);
-
-    ws.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        if (data.type === 'notification') {
-            document.getElementById('notif-badge').classList.remove('hidden');
-        }
+    const observerCallback = (entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const card = entry.target;
+                if (card.dataset.read === 'false') {
+                    markAsRead(card.dataset.id, card);
+                }
+            }
+        });
     };
+
+    const observerOptions = { root: null, rootMargin: '0px', threshold: 0.8 };
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+
+    // --- Filter Logic (Kept from previous successful version) ---
+    function filterNotifications(filter) {
+        let visibleCount = 0;
+        // Re-query cards in case content has loaded dynamically or been changed
+        allNotificationCards = Array.from(document.querySelectorAll('.notif-card'));
+        
+        allNotificationCards.forEach(card => {
+            const type = card.dataset.type;
+            
+            if (filter === 'all' || type === filter) {
+                card.style.display = 'flex';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+        
+        if (visibleCount === 0) {
+            noNotifsMessage.classList.remove('hidden');
+        } else {
+            noNotifsMessage.classList.add('hidden');
+        }
+        
+        // Re-attach observer only to visible, unread cards
+        allNotificationCards.forEach(card => {
+            observer.unobserve(card);
+            if (card.style.display !== 'none' && card.dataset.read === 'false') {
+                observer.observe(card);
+            }
+        });
+    }
+
+    // --- Click Handler for Redirection (Kept from previous successful version) ---
+    function handleCardClick(e) {
+        const card = e.currentTarget;
+        const linkDetails = card.dataset.linkDetails;
+        const simpleLink = card.dataset.simpleLink;
+        let redirectUrl = null;
+
+        if (linkDetails) {
+            const parts = linkDetails.split('|');
+            if (parts.length === 2) {
+                const courseId = parts[0];
+                const dateStr = parts[1];
+                redirectUrl = `/teacher/analytics/detail/${courseId}/${dateStr}/`;
+            }
+        } else if (simpleLink) {
+            redirectUrl = '#';
+        }
+
+        if (redirectUrl) {
+            window.location.href = redirectUrl;
+        }
+    }
+
+
+    // --- SWIPE LOGIC (Combined and Integrated) ---
+    let touchstartX = 0;
+    let touchendX = 0;
+    const swipeThreshold = 50; // Minimum distance (in pixels) for a swipe to register
+
+    function handleGesture() {
+        const diffX = touchendX - touchstartX;
+        // Exit if the swipe distance is too small
+        if (Math.abs(diffX) < swipeThreshold) return; 
+
+        const activeIndex = tabButtons.findIndex(btn => btn.classList.contains('active'));
+        let newIndex = -1;
+
+        if (diffX > 0) {
+            // Swipe Right: Go to previous tab (lower index)
+            newIndex = activeIndex > 0 ? activeIndex - 1 : -1;
+        } else { 
+            // Swipe Left: Go to next tab (higher index)
+            newIndex = activeIndex < tabButtons.length - 1 ? activeIndex + 1 : -1;
+        }
+
+        if (newIndex !== -1) {
+            const newButton = tabButtons[newIndex];
+            
+            // 1. Update active class on all tabs
+            document.querySelectorAll('.notif-tab').forEach(btn => btn.classList.remove('active'));
+            newButton.classList.add('active');
+            
+            // 2. Apply the filter for the newly active tab
+            filterNotifications(newButton.dataset.filter);
+        }
+    }
+    // --- End SWIPE LOGIC ---
+
+
+    // --- Event Listener Initialization (DOMContentLoaded) ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterTabs = document.getElementById('filter-tabs');
+        
+        // A. Set up click handlers for filter tabs
+        filterTabs.addEventListener('click', function(e) {
+            const button = e.target.closest('.notif-tab');
+            if (!button) return;
+
+            document.querySelectorAll('.notif-tab').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            filterNotifications(button.dataset.filter);
+        });
+        
+        // B. Set up click handlers for each notification card that is clickable
+        allNotificationCards.forEach(card => {
+            // Check if the card is meant to be clickable
+            if (card.dataset.linkDetails || (card.dataset.simpleLink && card.dataset.simpleLink !== '#')) {
+                 card.addEventListener('click', handleCardClick);
+            }
+        });
+
+        // C. Set up the Touch/Swipe handlers on the notification list area
+        if (notificationList) {
+            notificationList.addEventListener('touchstart', e => {
+                touchstartX = e.changedTouches[0].screenX;
+            });
+
+            // If the user drags their finger, prevent the page from scrolling vertically
+            notificationList.addEventListener('touchmove', e => {
+                const currentTouchX = e.changedTouches[0].screenX;
+                const diffX = currentTouchX - touchstartX;
+                // If horizontal movement is dominant, prevent default vertical scroll
+                if (Math.abs(diffX) > 10) { 
+                    e.preventDefault();
+                }
+            }, { passive: false }); // {passive: false} is needed for preventDefault to work
+
+            notificationList.addEventListener('touchend', e => {
+                touchendX = e.changedTouches[0].screenX;
+                handleGesture();
+            });
+        }
+
+
+        // Initial run
+        filterNotifications('all');
+        
+        // --- 5. Custom CSS for High-Contrast Tabs ---
+        const style = document.createElement('style');
+    
+        document.head.appendChild(style);
+    });
 </script>
 {% endblock %}

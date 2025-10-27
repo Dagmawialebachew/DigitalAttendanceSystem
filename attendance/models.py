@@ -314,9 +314,22 @@ class Notification(models.Model):
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     link = models.CharField(max_length=200, blank=True)
+    
+    relevant_course = models.ForeignKey('Course', on_delete=models.SET_NULL, null=True, blank=True)
+    relevant_date = models.DateField(null=True, blank=True)
+    # ----------------------------------------------
 
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.title}"
+
+    @property
+    def analytics_link_data(self):
+        """Returns a string like 'course_id|date_str' for teacher notifications."""
+        if self.relevant_course and self.relevant_date and self.user.is_teacher:
+            # Format the date as YYYY-MM-DD string
+            date_str = self.relevant_date.strftime('%Y-%m-%d')
+            return f"{self.relevant_course.id}|{date_str}"
+        return None

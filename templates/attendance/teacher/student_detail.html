@@ -1,0 +1,367 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Student Analytics: {{ student.get_full_name|default:student.email }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+    
+    <header class="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-4 border-slate-200 dark:border-slate-800">
+        <a href="{% url 'my_students' %}" class="text-primary-600 dark:text-primary-400 hover:text-primary-700 transition-colors mb-3 sm:mb-0 inline-flex items-center text-sm font-semibold">
+            <i class="fas fa-arrow-left mr-2"></i> Back to All Students
+        </a>
+        <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white">
+            {{ student.get_full_name|default:"Student Profile" }}
+        </h1>
+    </header>
+
+    <div class="bg-white dark:bg-slate-800/90 rounded-2xl p-6 shadow-2xl ring-1 ring-slate-100 dark:ring-slate-700/50 mb-6">
+        
+        <div class="flex flex-col md:flex-row md:items-start justify-between pb-6 border-b border-slate-200 dark:border-slate-700 mb-6">
+            <div class="flex items-center space-x-4">
+                <div class="w-16 h-16 rounded-full bg-primary-500/10 dark:bg-primary-500/20 flex items-center justify-center text-3xl text-primary-600 dark:text-primary-300">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div>
+                    <p class="text-lg font-semibold text-slate-800 dark:text-slate-200">{{ student.email }}</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 font-mono">ID: <span class="font-bold">{{ student.student_profile.student_id|default:"N/A" }}</span></p>
+                </div>
+            </div>
+            
+            <button class="mt-4 md:mt-0 px-5 py-2 bg-primary-600 text-white rounded-xl shadow-md hover:bg-primary-700 transition-all text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <i class="fas fa-file-pdf mr-2"></i> Download Full Report
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            <div class="p-5 rounded-xl bg-green-50 dark:bg-green-900/30 ring-2 ring-green-400/50 dark:ring-green-600/50 shadow-inner">
+                <h3 class="font-bold text-green-700 dark:text-green-300 mb-2 flex items-center">
+                    <i class="fas fa-percent mr-2"></i> Overall Attendance
+                </h3>
+                <p class="text-5xl font-extrabold text-green-800 dark:text-green-400 leading-tight">
+                    {{ attendance_stats.rate }}<span class="text-2xl font-semibold">%</span>
+                </p>
+                <p class="text-sm text-green-600 dark:text-green-400 mt-1">
+                    {{ attendance_stats.presents }} Present / {{ attendance_stats.total }} Total
+                </p>
+            </div>
+
+            <div class="p-5 rounded-xl bg-red-50 dark:bg-red-900/30 ring-2 ring-red-400/50 dark:ring-red-600/50 shadow-inner">
+                <h3 class="font-bold text-red-700 dark:text-red-300 mb-2 flex items-center">
+                    <i class="fas fa-exclamation-triangle mr-2"></i> Invalid Sessions
+                </h3>
+                <p class="text-5xl font-extrabold text-red-800 dark:text-red-400 leading-tight">
+                    {{ attendance_stats.invalid }}
+                </p>
+                <p class="text-sm text-red-600 dark:text-red-400 mt-1">Total sessions marked late or absent.</p>
+            </div>
+
+            <div class="p-5 rounded-xl bg-yellow-50 dark:bg-yellow-900/30 ring-2 ring-yellow-400/50 dark:ring-yellow-600/50 shadow-inner">
+                <h3 class="font-bold text-yellow-700 dark:text-yellow-300 mb-2 flex items-center">
+                    <i class="fas fa-trophy mr-2"></i> Gamification Points
+                </h3>
+                <p class="text-5xl font-extrabold text-yellow-800 dark:text-yellow-400 leading-tight">
+                    {{ student.gamification_points.total_points|default:"0" }}
+                </p>
+                <p class="text-sm text-yellow-600 dark:text-yellow-400 mt-1">Current total | Rank: TBD</p>
+            </div>
+        </div>
+    </div>
+    
+    {% if shared_courses|length > 1 %}
+    <div class="mb-8 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+        <nav class="flex space-x-4 -mb-px text-sm font-medium whitespace-nowrap" aria-label="Course Filter">
+            
+               if no context_course is set, or if the current URL doesn't represent 
+               the "All Courses" view (which your view currently doesn't support via URL). #}
+            {% with first_course=shared_courses.0 %}
+            <a href="{% url 'student_detail_teacher' student_id=student.id course_id=first_course.id %}" 
+               class="px-4 py-2 border-b-2 
+               {% if not context_course %}border-primary-500 text-primary-600 dark:text-primary-400 font-bold{% else %}border-transparent text-slate-500 dark:text-slate-400 hover:border-slate-300 hover:text-slate-700 dark:hover:text-slate-200{% endif %}
+               transition-colors duration-200 ease-in-out cursor-pointer">
+                All Courses (Aggregate)
+            </a>
+            {% endwith %}
+            
+            {# Links for Specific Courses (Now using the correct URL tag) #}
+            {% for course in shared_courses %}
+                <a href="{% url 'student_detail_teacher' student_id=student.id course_id=course.id %}" 
+                   class="px-4 py-2 border-b-2 
+                   {% if context_course and context_course.id == course.id %}border-primary-500 text-primary-600 dark:text-primary-400 font-bold{% else %}border-transparent text-slate-500 dark:text-slate-400 hover:border-slate-300 hover:text-slate-700 dark:hover:text-slate-200{% endif %}
+                   transition-colors duration-200 ease-in-out cursor-pointer">
+                    {{ course.code }}
+                </a>
+            {% endfor %}
+        </nav>
+        <p class="text-xs text-red-500 dark:text-red-400 mt-2">Note: To filter by course, click the specific course tab. The main stats remain aggregate.</p>
+    </div>
+    {% endif %}
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <div class="lg:col-span-4">
+            <div class="bg-white dark:bg-slate-800/90 rounded-2xl p-6 shadow-xl h-full sticky top-4 ring-1 ring-slate-100 dark:ring-slate-700/50">
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center border-b pb-3 border-slate-100 dark:border-slate-700">
+                    <i class="fas fa-list-alt mr-2 text-primary-500"></i> Enrolled Courses
+                </h2>
+                <div class="space-y-4">
+                    {% for course in shared_courses %}
+                        {# 🟢 TWEAK: Use the correct URL tag #}
+                        <a href="{% url 'student_detail_teacher' student_id=student.id course_id=course.id %}" 
+                           class="block p-4 rounded-xl border border-slate-300 dark:border-slate-700 
+                           {% if context_course and context_course.id == course.id %}bg-primary-100/50 dark:bg-primary-900/40 ring-2 ring-primary-500{% else %}bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all{% endif %}">
+                            <p class="font-extrabold text-base text-slate-900 dark:text-white truncate">{{ course.code }} - {{ course.name }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Taught by: {{ course.teacher.get_full_name }}</p>
+                        </a>
+                    {% empty %}
+                        <div class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center">
+                            <i class="fas fa-info-circle text-slate-400 mb-2"></i>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 italic">No courses shared with you found.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-8 space-y-8">
+            
+            <div class="bg-white dark:bg-slate-800/90 rounded-2xl p-6 shadow-xl ring-1 ring-slate-100 dark:ring-slate-700/50">
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center">
+                    <i class="fas fa-chart-line mr-2 text-primary-500"></i> Monthly Attendance Trends
+                    {% if context_course %}<span class="ml-3 text-sm font-semibold text-primary-600 dark:text-primary-400">({{ context_course.code }})</span>{% endif %}
+                </h2>
+                <div class="h-64 sm:h-80 md:h-96">
+                    <canvas id="monthlyAttendanceChart"></canvas>
+                </div>
+                {% if not monthly_stats %}
+                    <p class="text-slate-500 dark:text-slate-400 pt-4 text-center text-sm">
+                        <i class="fas fa-calendar-times mr-1"></i> No historical attendance data available for the chart.
+                    </p>
+                {% endif %}
+            </div>
+
+            <div class="bg-white dark:bg-slate-800/90 rounded-2xl p-6 shadow-xl ring-1 ring-slate-100 dark:ring-slate-700/50">
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center">
+                    <i class="fas fa-history mr-2 text-primary-500"></i> Detailed Session History
+                    {% if context_course %}<span class="ml-3 text-sm font-semibold text-primary-600 dark:text-primary-400">({{ context_course.code }})</span>{% endif %}
+                </h2>
+
+                <div id="accordion-history" class="space-y-3">
+                    {% for course_name, entries in history_by_course.items %}
+                        <div class="rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700">
+                            {# Accordion Header #}
+                            <button class="w-full text-left p-4 bg-slate-100 dark:bg-slate-700/70 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex justify-between items-center" 
+                                    onclick="toggleCollapse('collapse-{{ forloop.counter }}')">
+                                <span class="font-bold text-base text-slate-900 dark:text-white">{{ course_name }} ({{ entries|length }} Sessions)</span>
+                                <i class="fas fa-chevron-down text-slate-500 dark:text-slate-400 transform transition-transform duration-300" id="icon-{{ forloop.counter }}"></i>
+                            </button>
+
+                            {# Collapsible Content #}
+                            <div id="collapse-{{ forloop.counter }}" class="hidden p-4 bg-white dark:bg-slate-900/80">
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-slate-200 dark:divide-700">
+                                        <thead class="bg-slate-50 dark:bg-slate-800">
+                                            <tr>
+                                                <th class="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Date</th>
+                                                <th class="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Session</th>
+                                                <th class="px-3 py-2 text-center text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                                            {% for entry in entries %}
+                                                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                                    <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">
+                                                        {{ entry.timestamp_display|date:"Y-m-d" }} <span class="text-slate-400 block italic">                                                        {{ entry.timestamp_display|date:"H:i:s" }}
+</span>
+                                                    </td>
+                                                    <td class="px-3 py-3 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
+                                                        {{ entry.session.code|default:"Class Session" }}
+                                                    </td>
+                                                    <td class="px-3 py-3 whitespace-nowrap text-sm text-center">
+                                                        {% if entry.is_valid %}
+                                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-green-500/20 text-green-700 dark:bg-green-500/10 dark:text-green-300">
+                                                                P
+                                                            </span>
+                                                        {% else %}
+                                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-red-500/20 text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                                                                A
+                                                            </span>
+                                                        {% endif %}
+                                                    </td>
+                                                    
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center">
+                            <i class="fas fa-history text-slate-400 mb-2"></i>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 italic">No detailed attendance history found.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{# ------------------------------------------------------------------------------------------------------------------ #}
+{# The Python view must ensure monthly_stats is a list of dictionaries (using .values() and list()) to avoid TypeErrors #}
+{# ------------------------------------------------------------------------------------------------------------------ #}
+{{ monthly_stats|json_script:"monthly-stats-json" }}
+
+{# 1. Chart.js CDN #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    // --- Chart Data Retrieval and Parsing ---
+    const monthlyStatsElement = document.getElementById('monthly-stats-json');
+    const monthlyStatsJsonString = monthlyStatsElement ? monthlyStatsElement.textContent : '[]';
+    
+    let monthlyStatsData = [];
+    try {
+        monthlyStatsData = JSON.parse(monthlyStatsJsonString);
+    } catch (e) {
+        console.error("Failed to parse monthly stats JSON:", e);
+    }
+
+    // --- Data Transformation for Chart.js ---
+    const labels = monthlyStatsData.map(d => {
+        // TruncMonth provides a full date object (e.g., "2023-10-01T00:00:00Z")
+        const date = new Date(d.month);
+        // Format for chart readability
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+    });
+    const presentsData = monthlyStatsData.map(d => d.presents);
+    const invalidData = monthlyStatsData.map(d => d.invalid);
+    
+    // --- Chart Rendering ---
+    if (monthlyStatsData.length > 0) {
+        const ctx = document.getElementById('monthlyAttendanceChart').getContext('2d');
+        
+        // Dynamic colors for dark/light mode friendly presentation
+        const primaryColor = 'rgba(52, 211, 153, 0.9)'; // Tailwind Green-400/500
+        const dangerColor = 'rgba(248, 113, 113, 0.9)'; // Tailwind Red-400/500
+        const textColor = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#cbd5e1' : '#475569'; // Slate-300 or Slate-600
+
+        const attendanceChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Valid Attendance',
+                    data: presentsData,
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor.replace('0.9', '1'),
+                    borderWidth: 1,
+                    stack: 'Stack 1',
+                    borderRadius: 6, // Rounded bars for modern look
+                }, {
+                    label: 'Invalid/Late/Absent',
+                    data: invalidData,
+                    backgroundColor: dangerColor,
+                    borderColor: dangerColor.replace('0.9', '1'),
+                    borderWidth: 1,
+                    stack: 'Stack 1',
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: true,
+                        grid: { drawOnChartArea: false },
+                        ticks: { color: textColor }
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        title: { 
+                            display: true, 
+                            text: 'Total Sessions per Month',
+                            color: textColor 
+                        },
+                        ticks: { color: textColor }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: textColor,
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        padding: 12,
+                        cornerRadius: 8,
+                    }
+                }
+            }
+        });
+
+        // Simple responsiveness logic for theme change (if applicable)
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            attendanceChart.options.scales.x.ticks.color = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#cbd5e1' : '#475569';
+            attendanceChart.options.scales.y.ticks.color = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#cbd5e1' : '#475569';
+            attendanceChart.options.plugins.legend.labels.color = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#cbd5e1' : '#475569';
+            attendanceChart.options.scales.y.title.color = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#cbd5e1' : '#475569';
+            attendanceChart.update();
+        });
+    }
+
+    // --- Collapsible History Logic (Touch Friendly) ---
+    function toggleCollapse(targetId) {
+        const target = document.getElementById(targetId);
+        const iconId = 'icon-' + targetId.split('-')[1];
+        const icon = document.getElementById(iconId);
+
+        if (target.classList.contains('hidden')) {
+            // Open: Use max-height for smooth transition, then remove hidden
+            target.classList.remove('hidden');
+            target.style.maxHeight = '0px'; // Ensure starting from 0 if needed
+            requestAnimationFrame(() => {
+                target.style.maxHeight = target.scrollHeight + "px";
+            });
+
+            icon.classList.add('rotate-180');
+        } else {
+            // Close: Set height to current scroll height, then transition to 0 and add hidden
+            target.style.maxHeight = target.scrollHeight + "px";
+            requestAnimationFrame(() => {
+                target.style.maxHeight = "0px";
+                target.addEventListener('transitionend', function handler() {
+                    target.classList.add('hidden');
+                    target.style.maxHeight = ''; // Clean up inline style
+                    target.removeEventListener('transitionend', handler);
+                }, { once: true });
+            });
+            icon.classList.remove('rotate-180');
+        }
+    }
+</script>
+<style>
+/* Custom CSS for smooth accordion animation */
+#accordion-history div[id^="collapse-"] {
+    transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    overflow: hidden;
+    /* Added max-height: 0 to hidden state for initial render to not flash content */
+    max-height: 0; 
+    opacity: 1;
+}
+#accordion-history div[id^="collapse-"].hidden {
+    opacity: 0;
+}
+</style>
+{% endblock %}

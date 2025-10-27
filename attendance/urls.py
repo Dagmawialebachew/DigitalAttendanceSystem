@@ -22,6 +22,14 @@ urlpatterns = [
     path('teacher/session/<int:session_id>/', views.SessionDetailView.as_view(), name='session_detail'),
     path('teacher/session/<int:session_id>/end/', views.EndSessionView.as_view(), name='end_session'),
     path('teacher/session/<int:session_id>/override/', views.ManualOverrideView.as_view(), name='manual_override'),
+    path('teacher/my-students/', views.MyStudentsView.as_view(), name='my_students'),
+    path('teacher/student/<int:course_id>/<int:student_id>/', 
+         views.StudentDetailTeacherView.as_view(), 
+         name='student_detail_teacher'),
+    path('teacher/analytics/detail/<int:course_id>/<str:date_str>/', 
+         views.DailySessionDetailView.as_view(), 
+         name='teacher_daily_session_detail'),
+
     path('teacher/analytics/', views.AnalyticsView.as_view(), name='analytics'),
     path('teacher/export/<int:session_id>/', views.ExportAttendanceView.as_view(), name='export_attendance'),
 
