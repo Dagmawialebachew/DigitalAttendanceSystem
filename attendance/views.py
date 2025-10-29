@@ -533,35 +533,47 @@ class DailySessionDetailView(LoginRequiredMixin, TeacherRequiredMixin, View):
                 entry_time = entry.session.start_time
                 status = 'P' if entry.is_valid else 'A'
                 
-                # Update status only if it's the first record or a LATER session
+                # Update status only if it's the first record or a later session
                 if student_id not in status_tracking or entry_time > status_tracking[student_id]['session_time']:
                     status_tracking[student_id] = {
                         'status': status,
                         'session_time': entry_time
                     }
-        
+
             # 3. Compile the final roster using the tracking data
             roster = []
             for student in all_students:
-                final_status = status_tracking.get(student.id, {'status': 'A'})['status'] # Default to Absent if no entry
+                final_status = status_tracking.get(student.id, {'status': 'A'})['status']  # Default to Absent
                 
+                # Try to build name, fallback to studentprofile.student_id
+                full_name = f"{student.first_name or ''} {student.last_name or ''}".strip()
+                if not full_name:
+                    try:
+                        full_name = student.student_profile.student_id
+                    except AttributeError:
+                        full_name = str(student.id)  # fallback to DB ID if profile missing entirely
+
                 roster.append({
                     'id': student.id,
-                    'name': f"{student.first_name} {student.last_name}",
-                    'status': final_status, # 'P' or 'A'
+                    'name': full_name,
+                    'status': final_status,
                 })
-                
-        else:
-            # No sessions means everyone is Absent (by default)
-            roster = [{
-                'id': student.id, 
-                'name': f"{student.first_name} {student.last_name}", 
-                'status': 'A'
-            } for student in all_students]
-            
-        print(roster, "--- daily roster ---")
 
+        else:
+                # No sessions means everyone is Absent (by default)
+                roster = [{
+                    'id': student.id,
+                    'name': (
+                        f"{student.first_name or ''} {student.last_name or ''}".strip() or
+                        getattr(student.student_profile, 'student_id', str(student.id))
+                    ),
+                    'status': 'A'
+                } for student in all_students]
+
+        print(roster, "--- daily roster ---")
+            
         return roster
+
 # --- Student Views ---
 class StudentDashboardView(LoginRequiredMixin, StudentRequiredMixin, TemplateView):
     template_name = 'attendance/student/dashboard.html'
