@@ -391,7 +391,7 @@ class AnalyticsView(LoginRequiredMixin, TeacherRequiredMixin, View):
                 total_students = student_counts_map.get(session.course.id, 0)
                 present_count = session.present_count
                 percentage = min((present_count / total_students * 100) if total_students > 0 else 0, 100)
-                attendance_data.append({ 'date': session.start_time.strftime('%Y-%m-%d'), 'course_name': session.course.code, 'present': present_count, 'total': total_students, 'percentage': percentage })
+                attendance_data.append({ 'date': session.start_time.strftime('%Y-%m-%d'), 'course_name': session.course.code, 'present': present_count, 'total': total_students, 'percentage': percentage, 'course_id': session.course.id })
 
         # 8. Chart Data
         # Title says "Last 30", so let's slice it to 30
@@ -435,7 +435,6 @@ class ExportAttendanceView(LoginRequiredMixin, TeacherRequiredMixin, View):
         writer = csv.writer(response)
         writer.writerow([
             'Student Name',
-            'Email',
             'Student ID',
             'Date',
             'Time',
@@ -449,7 +448,6 @@ class ExportAttendanceView(LoginRequiredMixin, TeacherRequiredMixin, View):
 
             writer.writerow([
                 smart_str(e.student.get_full_name()),
-                smart_str(e.student.email),
                 smart_str(getattr(e.student.student_profile, 'student_id', '')),
                 date_str,
                 time_str,
